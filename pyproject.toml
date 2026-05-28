@@ -1,0 +1,38 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "sycamore-prep"
+version = "0.1.0"
+description = "Decision-support toolkit for a Sycamore Capital Research Analyst interview."
+readme = "README.md"
+requires-python = ">=3.11"
+authors = [{ name = "Brad Kelly" }]
+dependencies = [
+    "pandas>=2.2",
+    "numpy>=1.26",
+    "requests>=2.32",
+    "pyarrow>=15.0",
+    "openpyxl>=3.1",
+    "pydantic>=2.6",
+    "typer[all]>=0.12",
+    "yfinance>=0.2.40",
+    "PyYAML>=6.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0",
+    "pytest-cov>=5.0",
+]
+
+[project.scripts]
+sycamore-prep = "sycamore_prep.cli:app"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"

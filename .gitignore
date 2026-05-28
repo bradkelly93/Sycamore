@@ -1,0 +1,28 @@
+__pycache__/
+*.py[cod]
+*.egg-info/
+.eggs/
+.pytest_cache/
+.coverage
+.coverage.*
+htmlcov/
+.venv/
+venv/
+env/
+.env
+.idea/
+.vscode/
+*.swp
+.DS_Store
+
+# Local data + cache (never commit pulled fundamentals/prices)
+data/cache/
+data/raw/*.csv
+data/raw/*.xlsx
+!data/raw/.gitkeep
+build/
+dist/
+
+# Generated outputs
+*.xlsx
+!models/templates/*.xlsx

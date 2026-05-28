@@ -1,0 +1,37 @@
+# Sycamore Interview Prep Toolkit — runtime config.
+# Edit edgar.user_agent before running anything that hits SEC.
+
+edgar:
+  # SEC requires a descriptive User-Agent with a real contact string.
+  # Format: "Project/Version contact@example.com"
+  user_agent: "sycamore-prep/0.1 bradley.kelly93@gmail.com"
+  base_url: "https://data.sec.gov"
+  ticker_map_url: "https://www.sec.gov/files/company_tickers.json"
+  # Max requests/sec we will issue (SEC limit is ~10).
+  rate_limit_rps: 8
+
+cache:
+  dir: "data/cache"
+
+raw:
+  dir: "data/raw"
+  iws_holdings: "iws_holdings.csv"
+  iwn_holdings: "iwn_holdings.csv"
+  sycamore_holdings: "sycamore_holdings.csv"
+
+valuation:
+  # Defaults used by reverse_dcf and the Excel models; CLI flags override.
+  wacc: 0.09
+  terminal_growth: 0.025
+  forecast_years: 10
+
+# Peer maps for comps. Override per-run via CLI --peers.
+peers:
+  CW:  ["HEI", "TDG", "MOG.A", "KTOS", "CACI"]
+  WES: ["EPD", "ET", "MPLX", "PAGP"]
+  UMBF: ["CFR", "PB", "PNFP", "GBCI", "ASB"]
+  LECO: ["IEX", "ROP", "DOV", "PNR", "WTS"]
+  MTDR: ["MGY", "PR", "SM", "CIVI", "CRGY"]
+
+# Test tickers used in Phase 1 acceptance.
+test_tickers: ["CW", "WES", "UMBF", "LECO", "MTDR"]
