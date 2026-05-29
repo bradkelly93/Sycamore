@@ -94,6 +94,18 @@ def test_build_cases_orders_bear_base_bull_and_surfaces_downside():
         assert c.margin_of_safety == pytest.approx((c.fair_value_per_share - 10.0) / 10.0)
 
 
+def test_build_cases_uses_supplied_current_price_for_margin_of_safety():
+    # market_cap / shares = 10, but the real quote is 12 → MoS measured vs 12.
+    cases = build_cases(
+        current_market_cap=1000.0, net_debt=0.0, shares=100.0,
+        fcf0_base=50.0, wacc=0.09, terminal_growth=0.025, years=10,
+        assumed_growth=0.03, current_price=12.0,
+    )
+    for c in cases:
+        assert c.current_price == pytest.approx(12.0)
+        assert c.margin_of_safety == pytest.approx((c.fair_value_per_share - 12.0) / 12.0)
+
+
 def test_build_cases_bear_uses_conservative_fcf_seed():
     cases = build_cases(
         current_market_cap=1000.0, net_debt=0.0, shares=100.0,

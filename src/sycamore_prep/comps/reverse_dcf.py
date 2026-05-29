@@ -116,6 +116,7 @@ def build_cases(
     assumed_growth: float,
     fcf0_bear: float | None = None,
     fcf0_bull: float | None = None,
+    current_price: float | None = None,
     wacc_stress: float = 0.01,
     tg_stress: float = 0.005,
 ) -> list[DcfCase]:
@@ -124,9 +125,14 @@ def build_cases(
     does the reverse. `assumed_growth` is the conservative forward growth used
     for the fair-value / margin-of-safety read — typically the franchise's own
     realized FCF CAGR, clipped — shared across cases so the fan is comparable.
+
+    `current_price` is the price the margin of safety is measured against; pass
+    the actual quote so MoS reflects what an analyst sees. Falls back to
+    market_cap / diluted shares when no quote is supplied.
     """
     current_ev = current_market_cap + net_debt
-    current_price = current_market_cap / shares if shares > 0 else float("nan")
+    if current_price is None or current_price != current_price or current_price <= 0:
+        current_price = current_market_cap / shares if shares > 0 else float("nan")
     fcf0_bear = fcf0_base if fcf0_bear is None else fcf0_bear
     fcf0_bull = fcf0_base if fcf0_bull is None else fcf0_bull
 

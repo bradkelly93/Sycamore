@@ -114,7 +114,7 @@ def _current_market_cap(yfin: YFinanceProvider, ff: FinancialsFrame, ticker: str
             float(price) if price else float("nan"))
 
 
-def _build_dcf(ff: FinancialsFrame, mcap: float, wacc: float, tg: float, years: int) -> list:
+def _build_dcf(ff: FinancialsFrame, mcap: float, price: float, wacc: float, tg: float, years: int) -> list:
     fcf = free_cash_flow_fy(ff).dropna()
     if fcf.empty:
         return []
@@ -139,6 +139,7 @@ def _build_dcf(ff: FinancialsFrame, mcap: float, wacc: float, tg: float, years: 
         current_market_cap=mcap, net_debt=net_debt, shares=shares,
         fcf0_base=fcf0_latest, wacc=wacc, terminal_growth=tg, years=years,
         assumed_growth=assumed, fcf0_bear=fcf0_trough, fcf0_bull=fcf0_bull,
+        current_price=price,
     )
 
 
@@ -185,7 +186,7 @@ def analyze(
     history = build_history(ff, prices, mcap, bank, ticker, share_basis) \
         if (mcap == mcap and mcap > 0) else None
     normalized = normalized_earnings(ff, price) if price == price else None
-    dcf_cases = [] if bank else (_build_dcf(ff, mcap, wacc, terminal_growth, years)
+    dcf_cases = [] if bank else (_build_dcf(ff, mcap, price, wacc, terminal_growth, years)
                                  if (mcap == mcap and mcap > 0) else [])
 
     quality = {
