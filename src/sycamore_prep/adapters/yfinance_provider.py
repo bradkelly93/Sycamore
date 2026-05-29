@@ -19,6 +19,14 @@ from .base import CompanyMeta, FinancialsFrame, PriceProvider
 SOURCE_TAG = "yfinance (non-primary)"
 
 
+def _yf_symbol(ticker: str) -> str:
+    """yfinance uses a dash for share classes (BRK.B -> BRK-B, MOG.A -> MOG-A),
+    while SEC/EDGAR and our config use the dot form. Translate only at the
+    yfinance boundary; cache keys and the `ticker` column keep the dot form.
+    """
+    return ticker.upper().replace(".", "-")
+
+
 def _yf():
     # Import lazily so unit tests that don't touch yfinance don't need network.
     import yfinance as yf
@@ -46,7 +54,7 @@ class YFinanceProvider(PriceProvider):
         if cached is not None and start is None:
             return cached
         yf = _yf()
-        hist = self._retry(lambda: yf.Ticker(ticker).history(period="max", auto_adjust=False))
+        hist = self._retry(lambda: yf.Ticker(_yf_symbol(ticker)).history(period="max", auto_adjust=False))
         if hist.empty:
             return hist
         hist = hist.reset_index().rename(columns=str.lower)
@@ -60,7 +68,7 @@ class YFinanceProvider(PriceProvider):
     def get_market_cap(self, ticker: str) -> float | None:
         """Try fast_info first (cheap, reliable); fall back to slow get_info."""
         yf = _yf()
-        t = yf.Ticker(ticker)
+        t = yf.Ticker(_yf_symbol(ticker))
         try:
             fi = t.fast_info
             mc = fi.get("market_cap") or fi.get("marketCap")
@@ -81,7 +89,7 @@ class YFinanceProvider(PriceProvider):
         primary-source per CLAUDE.md."""
         yf = _yf()
         try:
-            fi = yf.Ticker(ticker).fast_info
+            fi = yf.Ticker(_yf_symbol(ticker)).fast_info
             price = fi.get("last_price") or fi.get("lastPrice") or fi.get("previousClose")
             if price:
                 return float(price)
@@ -92,14 +100,14 @@ class YFinanceProvider(PriceProvider):
     def get_shares(self, ticker: str) -> float | None:
         yf = _yf()
         try:
-            fi = yf.Ticker(ticker).fast_info
+            fi = yf.Ticker(_yf_symbol(ticker)).fast_info
             s = fi.get("shares") or fi.get("sharesOutstanding")
             if s:
                 return float(s)
         except Exception:  # noqa: BLE001
             pass
         try:
-            info = self._retry(lambda: yf.Ticker(ticker).get_info())
+            info = self._retry(lambda: yf.Ticker(_yf_symbol(ticker)).get_info())
             s = info.get("sharesOutstanding") if isinstance(info, dict) else None
             return float(s) if s else None
         except Exception:  # noqa: BLE001

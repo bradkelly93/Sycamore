@@ -38,6 +38,11 @@ from .valuation import (
     fcf_yield_fy,
     p_tbv_fy,
     percentile_vs_history,
+    cheapness_percentile,
+    historical_fcf_yields,
+    pe_history,
+    ev_ebitda_history,
+    p_tbv_history,
 )
 from .bank import (
     is_bank,
@@ -53,6 +58,7 @@ __all__ = [
     "interest_coverage_fy", "tangible_book_value_fy",
     "free_cash_flow_fy", "fcf_margin_fy", "fcf_conversion_fy",
     "pe_fy", "ev_ebitda_fy", "fcf_yield_fy", "p_tbv_fy",
-    "percentile_vs_history",
+    "percentile_vs_history", "cheapness_percentile", "historical_fcf_yields",
+    "pe_history", "ev_ebitda_history", "p_tbv_history",
     "is_bank", "net_interest_margin_fy", "allowance_to_loans_fy",
 ]

@@ -212,3 +212,37 @@ def test_synonym_picker_prefers_tag_with_most_periods():
     assert list(da["period"]) == [
         "2020-12-31", "2021-12-31", "2022-12-31", "2023-12-31", "2024-12-31",
     ]
+
+
+def test_synonym_picker_prefers_current_tag_over_longer_deprecated_one():
+    """The exact CW/CACI bug. A deprecated ASC-605 tag carries the LONGEST run
+    of annual periods (SalesRevenueNet, 2008-2017 = 10 years) while the current
+    ASC-606 tag has fewer but more-recent annuals (2021-2025 = 5). Ranking by
+    raw annual COUNT locked onto the stale tag and the canonical series ended
+    at 2017. The picker must prefer the tag covering the most recent fiscal
+    year even though it has fewer annual periods, so the series stays on the
+    live accounting basis."""
+    facts = _facts({
+        # Deprecated tag — 10 annual ends, but stops at 2017.
+        "SalesRevenueNet": {
+            "units": {"USD": [
+                {"start": f"{y}-01-01", "end": f"{y}-12-31", "val": 1000 + y,
+                 "fy": y, "fp": "FY", "form": "10-K", "filed": f"{y + 1}-02-15"}
+                for y in range(2008, 2018)
+            ]}
+        },
+        # Current tag — only 5 annual ends, but reaches 2025. Must win.
+        "RevenueFromContractWithCustomerExcludingAssessedTax": {
+            "units": {"USD": [
+                {"start": f"{y}-01-01", "end": f"{y}-12-31", "val": 2500 + y,
+                 "fy": y, "fp": "FY", "form": "10-K", "filed": f"{y + 1}-02-15"}
+                for y in range(2021, 2026)
+            ]}
+        },
+    })
+    df = _parse_company_facts("CW", facts, CANONICAL_CONCEPTS)
+    rev = df[df["concept"] == "Revenues"].sort_values("period")
+    assert rev["period"].iloc[-1] == "2025-12-31"      # live basis, not 2017
+    assert rev["period"].iloc[0] == "2021-12-31"        # single consistent tag
+    assert rev["value"].iloc[-1] == 2500 + 2025         # 4525
+    assert len(rev) == 5
