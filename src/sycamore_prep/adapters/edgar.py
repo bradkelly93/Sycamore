@@ -12,17 +12,27 @@ SEC requires:
 
 from __future__ import annotations
 
+import hashlib
 import json
+import re
 import time
 from functools import lru_cache
 from typing import Any, Iterable
+from urllib.parse import quote
 
 import pandas as pd
 import requests
 
 from ..config import load_config
 from . import cache
-from .base import CompanyMeta, FinancialsFrame, FundamentalsProvider
+from .base import (
+    CompanyMeta,
+    FILINGS_COLUMNS,
+    FilingsProvider,
+    FinancialsFrame,
+    FundamentalsProvider,
+    SEARCH_COLUMNS,
+)
 
 
 SOURCE_TAG = "edgar (primary)"
@@ -89,7 +99,7 @@ CANONICAL_CONCEPTS: dict[str, list[str]] = {
 }
 
 
-class EdgarProvider(FundamentalsProvider):
+class EdgarProvider(FundamentalsProvider, FilingsProvider):
     name = "edgar"
 
     def __init__(self, user_agent: str | None = None, rate_limit_rps: float | None = None):
@@ -98,6 +108,7 @@ class EdgarProvider(FundamentalsProvider):
         self._rps = rate_limit_rps or cfg.edgar.rate_limit_rps
         self._base = cfg.edgar.base_url
         self._ticker_map_url = cfg.edgar.ticker_map_url
+        self._fts_base = cfg.edgar.fts_base_url
         self._last_call: float = 0.0
         self._session = requests.Session()
         self._session.headers.update({
@@ -120,7 +131,11 @@ class EdgarProvider(FundamentalsProvider):
         # `requests.get` is fine even though we set Host on the session — the
         # Host header may not match for the static www.sec.gov endpoint, so
         # override per-call.
-        host = "www.sec.gov" if "www.sec.gov" in url else "data.sec.gov"
+        host = (
+            "efts.sec.gov" if "efts.sec.gov" in url
+            else "www.sec.gov" if "www.sec.gov" in url
+            else "data.sec.gov"
+        )
         headers = {"User-Agent": self._ua, "Host": host}
         resp = self._session.get(url, headers=headers, timeout=30)
         resp.raise_for_status()
@@ -182,6 +197,76 @@ class EdgarProvider(FundamentalsProvider):
         if concepts is not None:
             df = df[df["concept"].isin(list(concepts))]
         return FinancialsFrame(df)
+
+    # ---------- Filings surface (submissions + full-text search) ----------
+
+    def _to_cik(self, ticker_or_cik: str) -> tuple[str, str | None]:
+        """Return (cik10, ticker|None). Accepts a raw CIK or a ticker."""
+        s = str(ticker_or_cik).strip()
+        if s.isdigit():
+            return s.zfill(10), None
+        cik, _ = self._resolve(s)
+        return cik, s.upper()
+
+    def get_submissions(self, ticker_or_cik: str, *, use_cache: bool = True) -> pd.DataFrame:
+        cik, ticker = self._to_cik(ticker_or_cik)
+        key = f"submissions_{cik}"
+        raw = cache.load_json(key) if use_cache else None
+        if raw is None:
+            raw = self._get(f"{self._base}/submissions/CIK{cik}.json")
+            cache.save_json(key, raw)
+        return _flatten_submissions(cik, ticker, raw)
+
+    def search_filings(
+        self,
+        *,
+        forms: list[str],
+        query: str | None = None,
+        start: str | None = None,
+        end: str | None = None,
+        use_cache: bool = True,
+    ) -> pd.DataFrame:
+        q = query or "information statement"
+        forms_str = ",".join(forms)
+        key = "search_" + hashlib.md5(
+            f"{q}|{forms_str}|{start}|{end}".encode()
+        ).hexdigest()[:12]
+        raw = cache.load_json(key) if use_cache else None
+        if raw is None:
+            raw = self._fetch_search_pages(q, forms_str, start, end)
+            cache.save_json(key, raw)
+        return _parse_search_hits(raw)
+
+    def _fetch_search_pages(
+        self,
+        q: str,
+        forms_str: str,
+        start: str | None,
+        end: str | None,
+        page_cap: int = 10,
+    ) -> dict[str, Any]:
+        """Page through efts (100 hits/page) up to page_cap pages."""
+        hits: list[dict[str, Any]] = []
+        frm = 0
+        total: int | None = None
+        while True:
+            url = (
+                f"{self._fts_base}?q={quote(q)}&forms={forms_str}"
+                + (f"&startdt={start}" if start else "")
+                + (f"&enddt={end}" if end else "")
+                + (f"&from={frm}" if frm else "")
+            )
+            data = self._get(url)
+            page = (data.get("hits", {}) or {}).get("hits", []) or []
+            hits.extend(page)
+            if total is None:
+                total = ((data.get("hits", {}) or {}).get("total", {}) or {}).get(
+                    "value", len(hits)
+                )
+            frm += len(page)
+            if not page or frm >= (total or 0) or frm >= page_cap * 100:
+                break
+        return {"hits": {"hits": hits, "total": {"value": total or len(hits)}}}
 
 
 # --------------------------------------------------------------------------- #
@@ -330,3 +415,106 @@ def _pick_richest_synonym(
             best_tag = tag
             best_units = units
     return best_tag, best_units
+
+
+# --------------------------------------------------------------------------- #
+# Filings parsing (submissions index + full-text-search hits)
+# --------------------------------------------------------------------------- #
+
+def _flatten_submissions(cik: str, ticker: str | None, raw: dict[str, Any]) -> pd.DataFrame:
+    """Flatten the columnar `filings.recent` arrays into one row per filing.
+
+    Only the `recent` block is read (covers ~1y / 1000 filings). Older filings
+    paginate into `filings.files[]` shards — not fetched here; discovery leans
+    on full-text search for historical spins.
+    """
+    if ticker is None:
+        tks = raw.get("tickers") or []
+        ticker = tks[0] if tks else None
+    rec = (raw.get("filings", {}) or {}).get("recent", {}) or {}
+    forms = rec.get("form", []) or []
+    n = len(forms)
+
+    def col(key: str) -> list:
+        v = rec.get(key, []) or []
+        return list(v) if len(v) == n else [None] * n
+
+    accs, fdates, rdates = col("accessionNumber"), col("filingDate"), col("reportDate")
+    pdocs, pdesc = col("primaryDocument"), col("primaryDocDescription")
+    items, isx = col("items"), col("isXBRL")
+    cik_int = int(cik)
+    rows: list[dict[str, Any]] = []
+    for i in range(n):
+        accn = accs[i]
+        url = None
+        if accn and pdocs[i]:
+            url = (
+                f"https://www.sec.gov/Archives/edgar/data/{cik_int}/"
+                f"{str(accn).replace('-', '')}/{pdocs[i]}"
+            )
+        rows.append({
+            "cik": cik,
+            "ticker": ticker,
+            "form": forms[i],
+            "filing_date": fdates[i],
+            "report_date": rdates[i] or None,
+            "accession": accn,
+            "primary_document": pdocs[i],
+            "primary_doc_description": pdesc[i],
+            "items": items[i] or "",
+            "is_xbrl": bool(isx[i]) if isx[i] is not None else False,
+            "filing_url": url,
+            "source": SOURCE_TAG,
+        })
+    return pd.DataFrame(rows, columns=FILINGS_COLUMNS)
+
+
+# "Worthington Steel, Inc.  (WS)  (CIK 0001968487)" → name / ticker / cik.
+# The ticker group is optional: a not-yet-trading SpinCo has no ticker.
+_DISPLAY_NAME_RE = re.compile(
+    r"^(?P<name>.*?)\s*(?:\((?P<ticker>[A-Z0-9.\-]{1,6})\)\s*)?\(CIK\s*(?P<cik>\d{4,10})\)\s*$"
+)
+
+
+def _parse_display_name(dn: str | None) -> tuple[str | None, str | None, str | None]:
+    if not dn:
+        return None, None, None
+    m = _DISPLAY_NAME_RE.match(dn.strip())
+    if not m:
+        return dn.strip(), None, None
+    return (m.group("name") or "").strip() or None, m.group("ticker"), m.group("cik")
+
+
+def _parse_search_hits(raw: dict[str, Any]) -> pd.DataFrame:
+    hits = (raw.get("hits", {}) or {}).get("hits", []) or []
+    rows: list[dict[str, Any]] = []
+    for h in hits:
+        s = h.get("_source", {}) or {}
+        names = s.get("display_names") or [""]
+        name, ticker, dn_cik = _parse_display_name(names[0] if names else "")
+        ciks = s.get("ciks") or []
+        cik = (ciks[0] if ciks else dn_cik) or None
+        cik = str(cik).zfill(10) if cik else None
+        accn = s.get("adsh")
+        _id = h.get("_id", "") or ""
+        primary_doc = _id.split(":", 1)[1] if ":" in _id else None
+        url = None
+        if cik and accn and primary_doc:
+            url = (
+                f"https://www.sec.gov/Archives/edgar/data/{int(cik)}/"
+                f"{str(accn).replace('-', '')}/{primary_doc}"
+            )
+        rows.append({
+            "cik": cik,
+            "name": name,
+            "ticker": ticker,
+            "form": s.get("file_type") or s.get("form"),
+            "root_form": (s.get("root_forms") or [None])[0],
+            "file_date": s.get("file_date"),
+            "accession": accn,
+            "primary_document": primary_doc,
+            "sic": (s.get("sics") or [None])[0],
+            "filing_url": url,
+            "source": SOURCE_TAG,
+        })
+    return pd.DataFrame(rows, columns=SEARCH_COLUMNS)

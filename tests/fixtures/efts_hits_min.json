@@ -1,0 +1,33 @@
+{
+  "hits": {
+    "total": {"value": 2, "relation": "eq"},
+    "hits": [
+      {
+        "_id": "0001193125-23-263345:d465762d1012ba.htm",
+        "_source": {
+          "ciks": ["0001968487"],
+          "display_names": ["Worthington Steel, Inc.  (WS)  (CIK 0001968487)"],
+          "root_forms": ["10-12B"],
+          "file_type": "10-12B/A",
+          "form": "10-12B/A",
+          "adsh": "0001193125-23-263345",
+          "file_date": "2023-10-26",
+          "sics": ["3310"]
+        }
+      },
+      {
+        "_id": "0001104659-24-132493:tm2425234-6_1012b.htm",
+        "_source": {
+          "ciks": ["0002039497"],
+          "display_names": ["Resolute Holdings Management, Inc.  (CIK 0002039497)"],
+          "root_forms": ["10-12B"],
+          "file_type": "10-12B",
+          "form": "10-12B",
+          "adsh": "0001104659-24-132493",
+          "file_date": "2024-12-30",
+          "sics": ["6770"]
+        }
+      }
+    ]
+  }
+}

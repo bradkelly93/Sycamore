@@ -7,6 +7,8 @@ edgar:
   user_agent: "sycamore-prep/0.1 bradley.kelly93@gmail.com"
   base_url: "https://data.sec.gov"
   ticker_map_url: "https://www.sec.gov/files/company_tickers.json"
+  # EDGAR full-text search (spin-off discovery). Different host (efts.sec.gov).
+  fts_base_url: "https://efts.sec.gov/LATEST/search-index"
   # Max requests/sec we will issue (SEC limit is ~10).
   rate_limit_rps: 8
 
@@ -24,6 +26,16 @@ valuation:
   wacc: 0.09
   terminal_growth: 0.025
   forecast_years: 10
+
+spinoffs:
+  # Form 10 family that registers a spin-off SpinCo. `forms=10-12B` in
+  # full-text search returns base + /A amendments.
+  forms: ["10-12B"]
+  # Default lookback window for `spinoffs scan`.
+  lookback_days: 540
+  # Near-universal phrase in a Form 10 information statement — used as the
+  # full-text-search query so a forms-only scan still returns hits.
+  query: "information statement"
 
 # Peer maps for comps. Override per-run via CLI --peers.
 peers:

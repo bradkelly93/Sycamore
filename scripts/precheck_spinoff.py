@@ -1,4 +1,4 @@
-"""Phase 4 data-shape pre-check (submissions + companyfacts).
+r"""Phase 4 data-shape pre-check (submissions + companyfacts).
 
 Run locally where SEC endpoints are reachable (the web sandbox blocks
 *.sec.gov). Standalone — does NOT import sycamore_prep, so it works before any

@@ -106,3 +106,59 @@ class PriceProvider(ABC):
 
     @abstractmethod
     def get_shares(self, ticker: str) -> float | None: ...
+
+
+# Tidy schema for a filer's filing index (one row per filing). Downstream
+# spin-off code depends only on these columns — never on the raw SEC shape.
+FILINGS_COLUMNS = [
+    "cik",                     # 10-digit zero-padded
+    "ticker",                  # may be None (filer has no ticker / not resolved)
+    "form",                    # e.g. 10-12B, 10-12B/A, 8-K, 10-K
+    "filing_date",             # YYYY-MM-DD
+    "report_date",             # YYYY-MM-DD or None
+    "accession",               # 0000000000-00-000000
+    "primary_document",        # primary doc filename
+    "primary_doc_description",
+    "items",                   # 8-K item codes, comma-joined ("" if none)
+    "is_xbrl",                 # bool
+    "filing_url",              # canonical SEC Archives URL to the primary doc
+    "source",                  # provider tag, e.g. "edgar (primary)"
+]
+
+# Tidy schema for a full-text-search hit (one row per matched filing).
+SEARCH_COLUMNS = [
+    "cik", "name", "ticker", "form", "root_form",
+    "file_date", "accession", "primary_document", "sic",
+    "filing_url", "source",
+]
+
+
+class FilingsProvider(ABC):
+    """Filing-index + full-text-search surface (distinct from XBRL facts).
+
+    Kept separate from FundamentalsProvider so a future FactSet/Bloomberg
+    drop-in can implement filing discovery without reimplementing XBRL facts,
+    and vice-versa (CLAUDE.md principle 5 — swappable data layer). Both return
+    tidy DataFrames with a `source` column like every other adapter.
+    """
+
+    name: str = "base"
+
+    @abstractmethod
+    def get_submissions(self, ticker_or_cik: str, *, use_cache: bool = True) -> pd.DataFrame:
+        """Tidy filing index (one row per filing) for a single filer.
+
+        Columns: FILINGS_COLUMNS.
+        """
+
+    @abstractmethod
+    def search_filings(
+        self,
+        *,
+        forms: list[str],
+        query: str | None = None,
+        start: str | None = None,
+        end: str | None = None,
+        use_cache: bool = True,
+    ) -> pd.DataFrame:
+        """Full-text-search filings market-wide. Columns: SEARCH_COLUMNS."""

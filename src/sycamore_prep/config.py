@@ -14,7 +14,19 @@ class EdgarConfig(BaseModel):
     user_agent: str
     base_url: str = "https://data.sec.gov"
     ticker_map_url: str = "https://www.sec.gov/files/company_tickers.json"
+    fts_base_url: str = "https://efts.sec.gov/LATEST/search-index"
     rate_limit_rps: float = 8.0
+
+
+class SpinoffsConfig(BaseModel):
+    # Forms that register a spin-off SpinCo (Form 10 family). `forms=10-12B`
+    # in full-text search returns base + /A amendments.
+    forms: list[str] = Field(default_factory=lambda: ["10-12B"])
+    # How far back `spinoffs scan` looks by default.
+    lookback_days: int = 540
+    # Near-universal phrase in a Form 10 information statement; used as the
+    # full-text-search query so a forms-only scan still returns hits.
+    query: str = "information statement"
 
 
 class CacheConfig(BaseModel):
@@ -39,6 +51,7 @@ class AppConfig(BaseModel):
     cache: CacheConfig = Field(default_factory=CacheConfig)
     raw: RawConfig = Field(default_factory=RawConfig)
     valuation: ValuationConfig = Field(default_factory=ValuationConfig)
+    spinoffs: SpinoffsConfig = Field(default_factory=SpinoffsConfig)
     peers: dict[str, list[str]] = Field(default_factory=dict)
     test_tickers: list[str] = Field(default_factory=list)
 

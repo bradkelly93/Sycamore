@@ -1,4 +1,4 @@
-"""Phase 4 data-shape pre-check (EDGAR full-text search / efts.sec.gov).
+r"""Phase 4 data-shape pre-check (EDGAR full-text search / efts.sec.gov).
 
 Run locally where SEC endpoints are reachable (the web sandbox blocks
 efts.sec.gov). Confirms the full-text-search hit schema and whether the
