@@ -97,7 +97,7 @@ def records_to_df(records: list) -> pd.DataFrame:
             "review_flags": _join(r.review_flags),
             "sic": r.sic,
             "n_filings": len(r.accessions or []),
-            "primary_filing_url": (urls[-1] if urls else None),
+            "primary_filing_url": r.information_statement_url or (urls[-1] if urls else None),
             "sources": r.sources,
             "error": r.error,
         })
@@ -218,7 +218,7 @@ def _record_section(r) -> list[str]:
     L.append("**Downside flags:** "
              + (", ".join(r.downside_flags) if r.downside_flags else "_none computed_"))
     if r.review_flags:
-        link = r.filing_urls[-1] if r.filing_urls else None
+        link = r.information_statement_url or (r.filing_urls[-1] if r.filing_urls else None)
         L.append("**Review (read Form 10):** " + "; ".join(r.review_flags)
                  + (f" — [Form 10]({link})" if link else ""))
     L.append("")

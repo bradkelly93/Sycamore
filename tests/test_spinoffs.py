@@ -62,12 +62,25 @@ _LEVERED_FF = _ff({
     "CapEx": [("2022-12-31", 40), ("2023-12-31", 42), ("2024-12-31", 45)],
 })
 
-# A real-shape information statement (num-first ratio phrasing) for soft fields.
-_INFO_STMT = (
-    "Danaher will distribute to its shareholders one share of Veralto common "
-    "stock for every two shares of Danaher common stock held as of the record "
-    "date. The record date for the distribution is September 13, 2023. The "
-    "distribution date is expected to be September 30, 2023."
+# Real information-statement phrasing captured by precheck_infostmt.py.
+# Note: the date PRECEDES the "record date" anchor, and the distribution date
+# hangs off "will be distributed ... on" — the exact shapes that broke the
+# first-cut regexes.
+_INFO_STMT = (  # Danaher -> Veralto (1:3, record 2023-09-13, distributed 2023-09-30)
+    "The board of directors of Danaher approved the distribution of all of the "
+    "outstanding shares of Veralto common stock to holders of Danaher common stock. "
+    "Each Danaher stockholder will receive one share of Veralto common stock for "
+    "every three shares of Danaher common stock held at the close of business on "
+    "September 13, 2023, the record date for the distribution. It is expected that "
+    "all of the shares of Veralto common stock will be distributed by Danaher on "
+    "September 30, 2023, to holders of record of Danaher common stock."
+)
+_SOLV_INFO = (  # 3M -> Solventum (1:4, record 2024-03-18, distributed 2024-04-01)
+    "Each 3M shareholder as of the close of business on March 18, 2024, the record "
+    "date for the distribution, will receive one share of Solventum common stock for "
+    "every four shares of 3M common stock held by such shareholder. It is expected "
+    "that the distribution will occur at 3:30 a.m., Eastern Time, on April 1, 2024, "
+    "to holders of record of 3M common stock."
 )
 
 
@@ -196,12 +209,19 @@ def test_track_parent_explicit_spinco(provider: EdgarProvider):
 # soft-field extractor (fail-safe)
 # --------------------------------------------------------------------------- #
 
-def test_softfields_extracts_clear_terms():
+def test_softfields_extracts_veralto_terms():
     sf = softfields.extract(_INFO_STMT)
-    assert sf.distribution_ratio == "1:2"
+    assert sf.distribution_ratio == "1:3"          # date PRECEDES the anchor
     assert sf.record_date == "2023-09-13"
-    assert sf.distribution_date == "2023-09-30"
+    assert sf.distribution_date == "2023-09-30"    # "will be distributed ... on"
     assert sf.source == "derived (parsed 10-12B)"
+
+
+def test_softfields_extracts_solventum_terms():
+    sf = softfields.extract(_SOLV_INFO)
+    assert sf.distribution_ratio == "1:4"
+    assert sf.record_date == "2024-03-18"
+    assert sf.distribution_date == "2024-04-01"    # "distribution will occur ... on"
 
 
 def test_softfields_failsafe_on_no_match():
@@ -272,6 +292,13 @@ def test_run_track_end_to_end(tmp_path: Path, monkeypatch):
     monkeypatch.setattr(cache_mod, "cache_dir", lambda: tmp_path)
     monkeypatch.setattr(EdgarProvider, "get_financials",
                         lambda self, ticker, use_cache=True: _LEVERED_FF)
+    # The terms live in the EX-99.1, not the cover: index lists both; the
+    # tracker must resolve the exhibit-99 doc before parsing.
+    monkeypatch.setattr(EdgarProvider, "get_filing_index", lambda self, url, use_cache=True: [
+        {"name": "0001-index.html", "size": 500},
+        {"name": "cover-10x12b.htm", "size": 12000},
+        {"name": "exhibit991-info.htm", "size": 900000},
+    ])
     monkeypatch.setattr(EdgarProvider, "get_filing_text",
                         lambda self, url, use_cache=True: _INFO_STMT)
 
@@ -283,8 +310,10 @@ def test_run_track_end_to_end(tmp_path: Path, monkeypatch):
     assert r.parent_ticker == "DHR" and r.spinco_ticker == "SOLV"
     assert r.status == Status.COMPLETED.value
     assert "high_leverage" in r.downside_flags
+    # resolved the EX-99.1 information statement (not the cover)
+    assert r.information_statement_url.endswith("exhibit991-info.htm")
     # soft fields parsed from the (mocked) information statement
-    assert r.distribution_ratio == "1:2"
+    assert r.distribution_ratio == "1:3"
     assert r.record_date == "2023-09-13" and r.distribution_date == "2023-09-30"
     # both source tags present; three attributes reported separately
     assert "edgar (primary)" in r.sources and "derived (parsed 10-12B)" in r.sources

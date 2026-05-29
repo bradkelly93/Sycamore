@@ -59,6 +59,29 @@ def _set_forced_selling(rec: SpinoffRecord) -> None:
         rec.downside_flags.append("forced_selling_window")
 
 
+def _resolve_info_statement(edgar: EdgarProvider, filing_url: str, *, use_cache: bool) -> str:
+    """Pick the EX-99.1 information statement in a filing (largest non-index
+    .htm, preferring an exhibit-99 name). The distribution terms live there,
+    not in the 10-12B cover. Falls back to the given URL if the index is empty.
+    """
+    base = filing_url.rsplit("/", 1)[0] + "/"
+    docs = edgar.get_filing_index(filing_url, use_cache=use_cache)
+    htmls = [d for d in docs
+             if str(d.get("name", "")).lower().endswith((".htm", ".html"))
+             and "index" not in str(d.get("name", "")).lower()]
+    if not htmls:
+        return filing_url
+
+    def _size(d) -> int:
+        try:
+            return int(d.get("size") or 0)
+        except (TypeError, ValueError):
+            return 0
+
+    best = max(htmls, key=lambda d: ("99" in str(d.get("name", "")), _size(d)))
+    return base + best["name"]
+
+
 def _enrich(edgar: EdgarProvider, rec: SpinoffRecord, *, fetch_softfields: bool,
             use_cache: bool) -> SpinoffRecord:
     # 1) SpinCo fundamentals -> three-attribute + downside flags. Only when the
@@ -78,10 +101,16 @@ def _enrich(edgar: EdgarProvider, rec: SpinoffRecord, *, fetch_softfields: bool,
         if rec.spinco_ticker else "pending (no market price yet)"
     )
 
-    # 3) Soft fields from the latest 10-12B (fail-safe to pending).
+    # 3) Soft fields from the EX-99.1 information statement (NOT the 10-12B
+    #    cover — the distribution terms live in the exhibit). Fail-safe to pending.
     if fetch_softfields and rec.filing_urls:
         try:
-            sf = softfields.extract(edgar.get_filing_text(rec.filing_urls[-1], use_cache=use_cache))
+            rec.information_statement_url = _resolve_info_statement(
+                edgar, rec.filing_urls[-1], use_cache=use_cache
+            )
+            sf = softfields.extract(
+                edgar.get_filing_text(rec.information_statement_url, use_cache=use_cache)
+            )
             if sf.distribution_ratio:
                 rec.distribution_ratio = sf.distribution_ratio
                 rec.distribution_ratio_source = sf.source

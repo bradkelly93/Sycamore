@@ -255,9 +255,20 @@ def spinoffs_track(
     )
     typer.echo(f"  markdown tear-sheet → {res.md_path}")
     for r in res.records:
-        ds = ", ".join(r.downside_flags) if r.downside_flags else "none computed"
+        if r.downside_flags:
+            ds = ", ".join(r.downside_flags)
+        else:
+            ds = "none (financials loaded)" if r.has_financials else "n/a (no XBRL yet — pending)"
+        bits = []
+        if r.net_debt_ebitda is not None:
+            bits.append(f"net debt/EBITDA {r.net_debt_ebitda:.1f}x")
+        if r.distribution_ratio:
+            bits.append(f"ratio {r.distribution_ratio}")
+        if r.distribution_date:
+            bits.append(f"distributed {r.distribution_date}")
+        extra = ("  ·  " + " · ".join(bits)) if bits else ""
         typer.echo(f"  {r.spinco_name or r.spinco_ticker or r.spinco_cik} "
-                   f"[{r.status}]  downside: {ds}")
+                   f"[{r.status}]  downside: {ds}{extra}")
         if r.error:
             typer.secho(f"    WARNING: {r.error}", fg=typer.colors.YELLOW)
 

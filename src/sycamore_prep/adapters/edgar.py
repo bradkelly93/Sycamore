@@ -288,6 +288,23 @@ class EdgarProvider(FundamentalsProvider, FilingsProvider):
         cache.save_text(key, text)
         return text
 
+    def get_filing_index(self, filing_url: str, *, use_cache: bool = True) -> list[dict[str, Any]]:
+        """List the documents in a filing folder (from its index.json).
+
+        ``filing_url`` is any document URL inside the filing; the folder is
+        derived from it. Returns ``[{"name", "size"}, ...]`` so callers can
+        pick, e.g., the EX-99.1 information statement (the terms live there,
+        not in the 10-12B cover). Cached as a JSON sidecar.
+        """
+        base = filing_url.rsplit("/", 1)[0] + "/"
+        key = "index_" + hashlib.md5(base.encode()).hexdigest()[:16]
+        raw = cache.load_json(key) if use_cache else None
+        if raw is None:
+            raw = self._get(base + "index.json")
+            cache.save_json(key, raw)
+        items = (raw.get("directory", {}) or {}).get("item", []) or []
+        return [{"name": it.get("name"), "size": it.get("size")} for it in items]
+
 
 # --------------------------------------------------------------------------- #
 # Parsing

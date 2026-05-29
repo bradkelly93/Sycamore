@@ -61,6 +61,7 @@ class SpinoffRecord:
     sic: str | None = None
     accessions: list[str] = field(default_factory=list)
     filing_urls: list[str] = field(default_factory=list)
+    information_statement_url: str | None = None  # resolved EX-99.1 (terms live here)
     # ---- SpinCo fundamentals (only when companyfacts XBRL exists) ----
     has_financials: bool = False
     net_debt_ebitda: float | None = None
