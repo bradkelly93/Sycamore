@@ -261,7 +261,9 @@ def spinoffs_track(
             ds = "none (financials loaded)" if r.has_financials else "n/a (no XBRL yet — pending)"
         bits = []
         if r.net_debt_ebitda is not None:
-            bits.append(f"net debt/EBITDA {r.net_debt_ebitda:.1f}x")
+            nde = 0.0 if abs(r.net_debt_ebitda) < 0.05 else r.net_debt_ebitda
+            bits.append(f"net debt/EBITDA {nde:.1f}x"
+                        + (" (net cash)" if r.net_debt_ebitda < 0 else ""))
         if r.distribution_ratio:
             bits.append(f"ratio {r.distribution_ratio}")
         if r.distribution_date:
