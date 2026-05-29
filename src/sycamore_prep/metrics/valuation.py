@@ -103,3 +103,75 @@ def percentile_vs_history(series: pd.Series, current: float) -> float:
         return float("nan")
     rank = (clean < current).sum() + 0.5 * (clean == current).sum()
     return float(100.0 * rank / len(clean))
+
+
+def cheapness_percentile(series: pd.Series, current: float, lower_is_cheap: bool) -> float:
+    """Own-history percentile where HIGH always reads as 'cheap vs own history'.
+
+    Centralizes the sign convention so callers never have to remember which
+    multiples invert. P/E, EV/EBITDA, P/TBV are lower-is-cheaper → pass
+    lower_is_cheap=True (negated internally). FCF yield is higher-is-cheaper →
+    lower_is_cheap=False. NaN for <3 observations (see percentile_vs_history).
+    """
+    if pd.isna(current):
+        return float("nan")
+    if lower_is_cheap:
+        return percentile_vs_history(-series, -current)
+    return percentile_vs_history(series, current)
+
+
+def pe_history(ff: FinancialsFrame, price_by_period: pd.Series) -> pd.Series:
+    """Historical trailing P/E band = FY-end price / diluted EPS, per FY.
+
+    Deliberately shares-free (price/EPS, not mktcap/NI) so the band is robust to
+    whatever share-count basis is used elsewhere. `price_by_period` is the
+    unadjusted FY-end close indexed by period (YYYY-MM-DD), supplied by the
+    caller from yfinance (non-primary) aligned to EDGAR FY-ends. Negative-EPS
+    years carry no meaningful P/E and render NaN (kept out of the band, not 0).
+    """
+    eps = _series(ff, "EpsDiluted")
+    if eps.empty or price_by_period.empty:
+        return pd.Series(dtype=float, name="PE_History")
+    common = eps.index.intersection(price_by_period.index)
+    if common.empty:
+        return pd.Series(dtype=float, name="PE_History")
+    e = eps.loc[common]
+    pe = price_by_period.loc[common] / e
+    pe[e <= 0] = np.nan
+    return pe.rename("PE_History")
+
+
+def ev_ebitda_history(ff: FinancialsFrame, market_cap_by_period: pd.Series) -> pd.Series:
+    """Historical EV/EBITDA band. EV_t = market_cap_t + net_debt_t; EBITDA from
+    balance_sheet.ebitda_fy (OpInc + D&A). `market_cap_by_period` is indexed by
+    FY period-end (price_t × shares_t), supplied by the caller. EBITDA ≤ 0 → NaN.
+    """
+    eb = ebitda_fy(ff)
+    nd = net_debt_fy(ff)
+    if eb.empty or market_cap_by_period.empty:
+        return pd.Series(dtype=float, name="EV_EBITDA_History")
+    common = eb.index.intersection(market_cap_by_period.index)
+    if common.empty:
+        return pd.Series(dtype=float, name="EV_EBITDA_History")
+    ev = market_cap_by_period.loc[common] + nd.reindex(common).fillna(0.0)
+    ebc = eb.loc[common]
+    ratio = ev / ebc
+    ratio[ebc <= 0] = np.nan
+    return ratio.rename("EV_EBITDA_History")
+
+
+def p_tbv_history(ff: FinancialsFrame, market_cap_by_period: pd.Series) -> pd.Series:
+    """Historical P/TBV band (the bank valuation metric) = market_cap_t /
+    tangible book value_t. `market_cap_by_period` indexed by FY period-end.
+    Non-positive TBV → NaN.
+    """
+    tbv = tangible_book_value_fy(ff)
+    if tbv.empty or market_cap_by_period.empty:
+        return pd.Series(dtype=float, name="P_TBV_History")
+    common = tbv.index.intersection(market_cap_by_period.index)
+    if common.empty:
+        return pd.Series(dtype=float, name="P_TBV_History")
+    t = tbv.loc[common]
+    ratio = market_cap_by_period.loc[common] / t
+    ratio[t <= 0] = np.nan
+    return ratio.rename("P_TBV_History")
