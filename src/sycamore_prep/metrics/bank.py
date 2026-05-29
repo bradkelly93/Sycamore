@@ -14,12 +14,18 @@ from .profitability import _series
 
 
 def is_bank(ff: FinancialsFrame) -> bool:
-    """True if the ticker reports bank-specific tags (NII or Deposits)."""
+    """True if the ticker reports the GAAP `Deposits` line.
+
+    Looser heuristics caught false positives: any industrial that finances
+    customer purchases reports `AllowanceForLoanAndLeaseLosses` /
+    `FinancingReceivableAllowanceForCreditLosses` under CECL, and net
+    interest income can show up wherever a filer nets interest items.
+    Deposits is the cleanest single-tag bank signal — non-depository
+    institutions don't use it.
+    """
     if ff.df.empty:
         return False
-    bank_tags = {"NetInterestIncome", "Deposits", "AllowanceForLoanAndLeaseLosses"}
-    present = set(ff.df["concept"].unique())
-    return bool(bank_tags & present)
+    return "Deposits" in set(ff.df["concept"].unique())
 
 
 def net_interest_margin_fy(ff: FinancialsFrame) -> pd.Series:

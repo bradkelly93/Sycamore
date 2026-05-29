@@ -16,6 +16,16 @@ def _series(ff: FinancialsFrame, concept: str, fp: str = "FY") -> pd.Series:
     sub = ff.concept(concept, fp=fp)
     if sub.empty:
         return pd.Series(dtype=float, name=concept)
+    # Some filers mis-tag standalone quarterly values with fp=FY. When
+    # period_days is available (instant concepts have it as null, flow
+    # concepts as the calendar span), keep only annual flows (>=350 days)
+    # or instants. This filter is only applied to fp=FY queries — quarterly
+    # queries still see all matching rows.
+    if fp == "FY" and "period_days" in sub.columns:
+        days = pd.to_numeric(sub["period_days"], errors="coerce")
+        sub = sub[days.isna() | (days >= 350)]
+        if sub.empty:
+            return pd.Series(dtype=float, name=concept)
     s = pd.Series(sub["value"].astype(float).values, index=sub["period"].values, name=concept)
     # Some restatements collide on the same period — keep the last (latest filed).
     return s[~s.index.duplicated(keep="last")].sort_index()

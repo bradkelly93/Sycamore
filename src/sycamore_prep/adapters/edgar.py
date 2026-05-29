@@ -188,6 +188,24 @@ class EdgarProvider(FundamentalsProvider):
 # Parsing
 # --------------------------------------------------------------------------- #
 
+def _period_days(start: Any, end: Any) -> int | None:
+    """Days between start and end. Returns None for instant concepts (no start)."""
+    if not start or not end:
+        return None
+    try:
+        return int((pd.Timestamp(end) - pd.Timestamp(start)).days)
+    except Exception:  # noqa: BLE001
+        return None
+
+
+def _is_annual_or_instant(start: Any, end: Any) -> bool:
+    """True if this entry represents a full fiscal year (~12 months) or is
+    an instant balance-sheet snapshot (no start). The 350-day floor catches
+    52-week fiscal years (364 days) while rejecting quarters (~91)."""
+    d = _period_days(start, end)
+    return d is None or d >= 350
+
+
 def _parse_company_facts(
     ticker: str,
     facts_json: dict[str, Any],
@@ -195,19 +213,24 @@ def _parse_company_facts(
 ) -> pd.DataFrame:
     """Flatten SEC companyfacts JSON into the canonical tidy schema.
 
-    Two SEC quirks to handle:
+    Three SEC quirks to handle:
 
-    1. The `fy` field in companyfacts is the fiscal year of the FILING, not
-       of the period being reported. A 10-K filed for FY2024 publishes three
-       years of comparatives — end=[2022,2023,2024] — all tagged fy=2024.
-       So the correct dedupe key is `(end, fp, form)`: per period-end, keep
-       the latest-filed value (handles restatements; preserves every period).
+    1. `fy` is the fiscal year of the FILING, not the period. A 10-K for
+       FY2024 publishes 3 years of comparatives all tagged fy=2024. Correct
+       dedupe key is `(end, fp, form)`: one row per period-end, latest filed
+       wins (handles restatements; preserves every period).
 
-    2. For each canonical concept we try multiple US-GAAP synonyms. Different
-       filers tag the same line item differently, and some filers ALSO switch
-       tags across years. We pick the synonym with the most unique period-end
-       dates after dedupe — "richest" wins, not "first in list" — so we don't
-       latch onto a single legacy entry just because its tag sorts earlier.
+    2. Multiple US-GAAP synonyms per concept. Different filers use different
+       tags, and ONE filer may switch tags across years (CW moved Revenues
+       to a RevenueFromContractWithCustomer tag in 2018 for ASC 606). We
+       pick whichever candidate has the most unique ANNUAL period-end dates,
+       not the most raw entries — otherwise a pre-2018 tag with quarterly
+       interim entries beats a clean post-2018 tag with only FY entries.
+
+    3. Some filers mis-tag standalone quarterly values with fp=FY. We capture
+       `start` from each entry and store `period_days = end - start` so the
+       _series helper can filter FY queries to entries with span >= 350
+       days (or instant snapshots with no start).
     """
     facts = facts_json.get("facts", {}).get("us-gaap", {})
     rows: list[dict[str, Any]] = []
@@ -235,12 +258,14 @@ def _parse_company_facts(
                     "value": e.get("val"),
                     "unit": unit_name,
                     "source": SOURCE_TAG,
+                    "period_start": e.get("start"),
+                    "period_days": _period_days(e.get("start"), e.get("end")),
                 })
 
     if not rows:
         return pd.DataFrame(columns=[
             "ticker", "concept", "period", "fy", "fp", "form",
-            "value", "unit", "source",
+            "value", "unit", "source", "period_start", "period_days",
         ])
 
     df = pd.DataFrame(rows)
@@ -253,7 +278,12 @@ def _pick_richest_synonym(
     candidates: list[str],
 ) -> tuple[str | None, dict[str, list[dict[str, Any]]]]:
     """Return (chosen_tag, units_dict) for whichever candidate has the most
-    unique period-end dates across all units. Empty dict if none match."""
+    unique ANNUAL (or instant) period-end dates.
+
+    Counting annual periods specifically — not raw entries — avoids the
+    pathological case where a legacy tag with many quarterly interim
+    entries outranks a current tag with clean annual coverage.
+    """
     best_tag: str | None = None
     best_units: dict[str, list[dict[str, Any]]] = {}
     best_periods = -1
@@ -261,12 +291,14 @@ def _pick_richest_synonym(
         if tag not in facts:
             continue
         units = facts[tag].get("units", {}) or {}
-        unique_periods: set[Any] = set()
+        unique_annual_ends: set[Any] = set()
         for entries in units.values():
             for e in entries:
-                unique_periods.add(e.get("end"))
-        if len(unique_periods) > best_periods:
-            best_periods = len(unique_periods)
+                end = e.get("end")
+                if end and _is_annual_or_instant(e.get("start"), end):
+                    unique_annual_ends.add(end)
+        if len(unique_annual_ends) > best_periods:
+            best_periods = len(unique_annual_ends)
             best_tag = tag
             best_units = units
     return best_tag, best_units

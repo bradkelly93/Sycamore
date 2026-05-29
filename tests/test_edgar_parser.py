@@ -112,6 +112,79 @@ def test_parser_dedupes_restatements_within_a_period():
     assert rev.iloc[0]["value"] == 108.0
 
 
+def test_parser_captures_period_start_and_days():
+    """The parser must record `start` and `period_days` so downstream code
+    can distinguish annual flows (~365d) from mis-tagged quarterly (~91d)."""
+    facts = _facts({
+        "Revenues": {
+            "units": {"USD": [
+                {"start": "2024-01-01", "end": "2024-12-31", "val": 3000,
+                 "fy": 2024, "fp": "FY", "form": "10-K", "filed": "2025-02-15"},
+            ]}
+        },
+        "Assets": {
+            # Instant concept — no `start`.
+            "units": {"USD": [
+                {"end": "2024-12-31", "val": 50000, "fy": 2024, "fp": "FY",
+                 "form": "10-K", "filed": "2025-02-15"},
+            ]}
+        }
+    })
+    df = _parse_company_facts("ABC", facts, CANONICAL_CONCEPTS)
+    rev = df[df["concept"] == "Revenues"].iloc[0]
+    assert rev["period_start"] == "2024-01-01"
+    assert rev["period_days"] == 365 or rev["period_days"] == 366
+    assets = df[df["concept"] == "Assets"].iloc[0]
+    assert assets["period_start"] is None or pd.isna(assets["period_start"])
+    assert assets["period_days"] is None or pd.isna(assets["period_days"])
+
+
+def test_synonym_picker_counts_only_annual_periods():
+    """The legacy 'Revenues' tag for CW had 12 quarterly interim entries
+    (2015 Q1 through 2017 Q4) plus 3 FY annuals. The post-2018 ASC 606 tag
+    had 8 clean FY annuals. Picking by raw entry count chose the legacy
+    tag and missed every recent fiscal year. Annual-period count fixes it."""
+    facts = _facts({
+        "Revenues": {
+            "units": {"USD": [
+                # 3 annual entries (clean)…
+                {"start": "2015-01-01", "end": "2015-12-31", "val": 2200,
+                 "fy": 2015, "fp": "FY", "form": "10-K", "filed": "2016-02-15"},
+                {"start": "2016-01-01", "end": "2016-12-31", "val": 2100,
+                 "fy": 2016, "fp": "FY", "form": "10-K", "filed": "2017-02-15"},
+                {"start": "2017-01-01", "end": "2017-12-31", "val": 2300,
+                 "fy": 2017, "fp": "FY", "form": "10-K", "filed": "2018-02-15"},
+                # …plus 6 quarterly interim entries mis-tagged fp=FY.
+                *[
+                    {"start": s, "end": e, "val": 550, "fy": fy, "fp": "FY",
+                     "form": "10-K", "filed": "2018-02-15"}
+                    for s, e, fy in [
+                        ("2015-01-01", "2015-03-31", 2015),
+                        ("2015-04-01", "2015-06-30", 2015),
+                        ("2015-07-01", "2015-09-30", 2015),
+                        ("2016-01-01", "2016-03-31", 2016),
+                        ("2016-04-01", "2016-06-30", 2016),
+                        ("2016-07-01", "2016-09-30", 2016),
+                    ]
+                ],
+            ]}
+        },
+        # 8 clean annuals — must win even though raw entry count is lower.
+        "RevenueFromContractWithCustomerExcludingAssessedTax": {
+            "units": {"USD": [
+                {"start": f"{y}-01-01", "end": f"{y}-12-31", "val": 2500 + (y - 2018) * 100,
+                 "fy": y, "fp": "FY", "form": "10-K", "filed": f"{y + 1}-02-15"}
+                for y in range(2018, 2026)
+            ]}
+        }
+    })
+    df = _parse_company_facts("CW", facts, CANONICAL_CONCEPTS)
+    rev = df[df["concept"] == "Revenues"].sort_values("period")
+    # Should have picked the post-2018 tag — last period should be 2025.
+    assert rev["period"].iloc[-1] == "2025-12-31"
+    assert rev["value"].iloc[-1] == 2500 + 7 * 100  # 3200
+
+
 def test_synonym_picker_prefers_tag_with_most_periods():
     """When two synonyms both have data, pick the richer one. Previously
     'first synonym wins' caused D&A to come back as a single 2009 row because

@@ -22,6 +22,13 @@ FINANCIALS_COLUMNS = [
     "value",        # numeric value in reporting units
     "unit",         # e.g., "USD", "USD/shares", "shares"
     "source",       # provider tag, e.g., "edgar (primary)"
+    "period_start", # period start (None for instant concepts like Assets)
+    "period_days",  # end - start in days; None for instant. Used to filter
+                    # filer-mis-tagged quarterly values out of FY queries.
+]
+FINANCIALS_COLUMNS_REQUIRED = [
+    "ticker", "concept", "period", "fy", "fp", "form",
+    "value", "unit", "source",
 ]
 
 
@@ -35,12 +42,22 @@ class CompanyMeta:
 
 
 class FinancialsFrame:
-    """Thin wrapper around a tidy DataFrame to enforce schema."""
+    """Thin wrapper around a tidy DataFrame to enforce schema.
+
+    Required columns must be present. Optional columns (period_start,
+    period_days) are added as null if missing — keeps old cached parquets
+    and test fixtures readable while the duration-based FY filter is opt-in.
+    """
 
     def __init__(self, df: pd.DataFrame):
-        missing = [c for c in FINANCIALS_COLUMNS if c not in df.columns]
+        missing = [c for c in FINANCIALS_COLUMNS_REQUIRED if c not in df.columns]
         if missing:
             raise ValueError(f"FinancialsFrame missing columns: {missing}")
+        df = df.copy()
+        if "period_start" not in df.columns:
+            df["period_start"] = pd.NA
+        if "period_days" not in df.columns:
+            df["period_days"] = pd.NA
         self.df = df[FINANCIALS_COLUMNS].copy()
 
     def concept(self, name: str, fp: str | None = "FY") -> pd.DataFrame:

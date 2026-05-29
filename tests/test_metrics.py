@@ -78,6 +78,33 @@ INDUSTRIAL_ROWS = [
 ]
 
 
+def test_series_filter_excludes_quarterly_entries_tagged_FY():
+    """When `period_days` is present, FY queries must reject sub-annual spans.
+    Reproduces the CW gross-margin >100% bug: standalone quarterly values
+    tagged fp=FY were polluting the Revenue denominator."""
+    from sycamore_prep.metrics.profitability import _series
+
+    rows = [
+        # Genuine FY entries (~365 days).
+        {"concept": "Revenues", "period": "2023-12-31", "value": 3000.0,
+         "fy": 2023, "period_start": "2023-01-01", "period_days": 365},
+        {"concept": "Revenues", "period": "2024-12-31", "value": 3300.0,
+         "fy": 2024, "period_start": "2024-01-01", "period_days": 366},
+        # Standalone Q1 2024 mis-tagged FY (90-day span) — must be excluded.
+        {"concept": "Revenues", "period": "2024-03-31", "value": 800.0,
+         "fy": 2024, "period_start": "2024-01-01", "period_days": 90},
+        # Instant balance-sheet entry (no start) — must be kept.
+        {"concept": "Assets", "period": "2024-12-31", "value": 50000.0,
+         "fy": 2024, "period_start": None, "period_days": None},
+    ]
+    ff = _ff(rows)
+    rev = _series(ff, "Revenues")
+    assert list(rev.index) == ["2023-12-31", "2024-12-31"]
+    assert list(rev.values) == [3000.0, 3300.0]
+    assets = _series(ff, "Assets")
+    assert list(assets.values) == [50000.0]
+
+
 def test_revenue_and_margins():
     ff = _ff(INDUSTRIAL_ROWS)
     assert revenue_fy(ff).iloc[-1] == 1200.0
@@ -153,14 +180,29 @@ BANK_ROWS = [
     {"concept": "IntangibleAssetsNet",      "period": "2022-12-31", "value": 100.0, "fy": 2022},
     {"concept": "IntangibleAssetsNet",      "period": "2023-12-31", "value": 100.0, "fy": 2023},
     {"concept": "NetInterestIncome",        "period": "2023-12-31", "value": 500.0, "fy": 2023},
+    {"concept": "Deposits",                 "period": "2022-12-31", "value": 35000.0, "fy": 2022},
+    {"concept": "Deposits",                 "period": "2023-12-31", "value": 36000.0, "fy": 2023},
     {"concept": "Assets",                   "period": "2022-12-31", "value": 40000.0, "fy": 2022},
     {"concept": "Assets",                   "period": "2023-12-31", "value": 42000.0, "fy": 2023},
 ]
 
 
-def test_is_bank_detection():
+def test_is_bank_requires_deposits():
+    """Deposits is the cleanest single-tag bank signal. CECL allowances and
+    netted interest income show up at non-bank industrials too, so the old
+    'NII OR Deposits OR Allowance' heuristic caught false positives like
+    Lincoln Electric (Brad's live screen surfaced it)."""
     assert is_bank(_ff(BANK_ROWS)) is True
     assert is_bank(_ff(INDUSTRIAL_ROWS)) is False
+    # Industrial reporting a CECL credit-loss allowance on trade receivables
+    # is NOT a bank — must be excluded.
+    industrial_with_cecl = INDUSTRIAL_ROWS + [
+        {"concept": "AllowanceForLoanAndLeaseLosses",
+         "period": "2023-12-31", "value": 5.0, "fy": 2023},
+        {"concept": "NetInterestIncome",
+         "period": "2023-12-31", "value": 10.0, "fy": 2023},
+    ]
+    assert is_bank(_ff(industrial_with_cecl)) is False
 
 
 def test_rotce_and_tbv():
