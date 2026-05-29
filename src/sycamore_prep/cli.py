@@ -108,9 +108,10 @@ def screen_cmd(
         False, "--skip-market-cap",
         help="Skip yfinance market-cap fetch; quality + improving scores only.",
     ),
-    include_neg_space: bool = typer.Option(
-        False, "--include-negative-space",
-        help="Don't exclude names that trip Sycamore's negative-space filters.",
+    hard_exclude: bool = typer.Option(
+        False, "--hard-exclude-negative-space",
+        help="Remove flagged names from the ranking entirely. Default keeps "
+             "them visible (sub-scores shown) but sorted to the bottom.",
     ),
 ) -> None:
     """Run the three-attribute quality-value screener.
@@ -124,14 +125,14 @@ def screen_cmd(
         limit=limit,
         output_path=output,
         skip_market_cap=skip_market_cap,
-        exclude_neg_space=not include_neg_space,
+        hard_exclude_neg_space=hard_exclude,
     )
     out = output or (cache_dir() / "screener_output.xlsx")
     typer.secho(f"Scored {len(df)} tickers → {out}", fg=typer.colors.GREEN)
     cols_to_show = [c for c in [
         "name", "composite_rank", "q1_quality_score",
         "q2_valuation_score", "q3_improving_score",
-        "excluded_negative_space", "ns_flags",
+        "negative_space", "ns_flags",
     ] if c in df.columns]
     typer.echo(df[cols_to_show].head(20).to_string())
 

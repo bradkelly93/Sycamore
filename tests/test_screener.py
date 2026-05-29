@@ -111,11 +111,11 @@ def test_run_screener_end_to_end_offline(patched_adapters: Path):
         tickers=["AAA", "BBB"],
         skip_market_cap=True,
         output_path=patched_adapters / "screener_output.xlsx",
-        exclude_neg_space=False,  # don't filter — we want both rows scored
     )
     assert (patched_adapters / "screener_output.xlsx").exists()
     assert set(out.index) == {"AAA", "BBB"}
-    # AAA has stronger quality (higher ROIC, lower leverage) → composite_rank=1.
+    # AAA has stronger quality (higher ROIC, lower leverage) and is clean;
+    # BBB has negative earnings / low FCF so it's flagged and sorted last.
     assert out.loc["AAA", "composite_rank"] == 1
     assert out.loc["BBB", "composite_rank"] == 2
     # Sub-scores reported separately (the headline CLAUDE.md requirement).
@@ -125,17 +125,33 @@ def test_run_screener_end_to_end_offline(patched_adapters: Path):
     assert "edgar (primary)" in out.loc["AAA", "sources"]
 
 
-def test_negative_space_filter_excludes_high_leverage(patched_adapters: Path):
+def test_default_keeps_flagged_names_visible_but_downranked(patched_adapters: Path):
     out = run_screener(
         tickers=["AAA", "BBB"],
         skip_market_cap=True,
-        output_path=patched_adapters / "screener_output2.xlsx",
-        exclude_neg_space=True,
+        output_path=patched_adapters / "screener_keep.xlsx",
     )
-    # BBB has negative net income in 2023 and high leverage; should be flagged
-    # and excluded from ranking (composite_rank NaN), but still present in
-    # output with ns_flags populated.
+    # BBB trips a negative-space flag (negative NI / low FCF) but is KEPT,
+    # with sub-scores still populated and a (worse) rank — never hidden.
+    assert bool(out.loc["BBB", "negative_space"]) is True
+    assert out.loc["BBB", "ns_flags"]                       # non-empty
+    assert pd.notna(out.loc["BBB", "composite_rank"])       # still ranked
+    assert pd.notna(out.loc["BBB", "q1_quality_score"])     # sub-score visible
+    # Clean name AAA outranks the flagged BBB regardless of raw composite.
+    assert out.loc["AAA", "composite_rank"] < out.loc["BBB", "composite_rank"]
+
+
+def test_hard_exclude_drops_flagged_from_ranking(patched_adapters: Path):
+    out = run_screener(
+        tickers=["AAA", "BBB"],
+        skip_market_cap=True,
+        output_path=patched_adapters / "screener_hard.xlsx",
+        hard_exclude_neg_space=True,
+    )
+    # Under hard-exclude, BBB stays in the output (flags visible) but is
+    # removed from the ranking (composite_rank NaN).
     assert "BBB" in out.index
-    assert out.loc["BBB", "excluded_negative_space"] is True or \
-           out.loc["BBB", "excluded_negative_space"] == True  # noqa: E712
-    assert out.loc["BBB", "ns_flags"]  # non-empty
+    assert bool(out.loc["BBB", "negative_space"]) is True
+    assert pd.isna(out.loc["BBB", "composite_rank"])
+    # The clean name still gets a real rank.
+    assert out.loc["AAA", "composite_rank"] == 1

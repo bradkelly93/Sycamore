@@ -228,9 +228,16 @@ def run_screener(
     limit: int | None = None,
     output_path: Path | str | None = None,
     skip_market_cap: bool = False,
-    exclude_neg_space: bool = True,
+    hard_exclude_neg_space: bool = False,
 ) -> pd.DataFrame:
-    """Run the three-attribute screen and write screener_output.xlsx."""
+    """Run the three-attribute screen and write screener_output.xlsx.
+
+    Negative-space handling (CLAUDE.md principle 2 — decompose, never hide):
+    by default, names that trip a negative-space flag are KEPT in the output
+    with all three sub-scores visible, just sorted to the bottom with their
+    flags shown. Set hard_exclude_neg_space=True to drop them from the
+    ranking entirely (composite_rank = NaN).
+    """
     edgar = EdgarProvider()
     yfin = None if skip_market_cap else YFinanceProvider()
 
@@ -265,43 +272,46 @@ def run_screener(
     raw["ns_flags"] = raw["ns_flags"].apply(
         lambda v: ", ".join(v) if isinstance(v, list) else ""
     )
+    raw["negative_space"] = raw["ns_flags"].fillna("").str.len() > 0
 
-    if exclude_neg_space:
-        # Drop names that triggered any negative-space flag.
-        in_neg = raw["ns_flags"].fillna("").str.len() > 0
-        raw["excluded_negative_space"] = in_neg
-        scored_input = raw.loc[~in_neg].copy()
-    else:
-        raw["excluded_negative_space"] = False
-        scored_input = raw.copy()
+    # Score ALL names — sub-scores stay honest even for flagged names so the
+    # three-axis decomposition is never hidden (CLAUDE.md principle 2). The
+    # negative-space policy only affects the RANK, not the sub-scores.
+    result = score_universe(raw)
+    score_cols = [c for c in result.df.columns
+                  if c.endswith("_score") or c.endswith("_pctile")]
+    out = raw.join(result.df[score_cols], how="left")
 
-    if scored_input.empty:
-        out = raw.copy()
-        out["composite_score"] = np.nan
-        out["composite_rank"] = np.nan
-    else:
-        result = score_universe(scored_input)
-        out = raw.join(
-            result.df[[c for c in result.df.columns if c.endswith("_score")
-                       or c.endswith("_pctile") or c == "composite_rank"]],
-            how="left",
+    if hard_exclude_neg_space:
+        # Flagged names removed from the ranking entirely (rank = NaN), but
+        # kept in the output with sub-scores + flags for transparency.
+        clean = out.loc[~out["negative_space"], "composite_score"]
+        out["composite_rank"] = clean.rank(ascending=False, method="min")
+        out = out.sort_values(
+            ["negative_space", "composite_score"],
+            ascending=[True, False], na_position="last",
         )
+    else:
+        # Keep flagged names but down-rank: clean names first (by composite),
+        # flagged names after (by their own composite). composite_score stays
+        # the honest weighted blend — only the rank encodes the down-ranking.
+        out = out.sort_values(
+            ["negative_space", "composite_score"],
+            ascending=[True, False], na_position="last",
+        )
+        out["composite_rank"] = range(1, len(out) + 1)
+        out.loc[out["composite_score"].isna(), "composite_rank"] = np.nan
 
     # Reorder columns: identity, sub-scores prominent, then components, then sources.
     front = [
         "name", "gics_sector", "is_bank", "market_cap",
         "composite_rank", "composite_score",
         "q1_quality_score", "q2_valuation_score", "q3_improving_score",
-        "excluded_negative_space", "ns_flags",
+        "negative_space", "ns_flags",
     ]
     front = [c for c in front if c in out.columns]
     rest = [c for c in out.columns if c not in front]
     out = out[front + rest]
-    out = out.sort_values(
-        ["composite_rank", "composite_score"],
-        ascending=[True, False],
-        na_position="last",
-    )
 
     output_path = Path(output_path) if output_path else (cache_dir() / "screener_output.xlsx")
     _write_screener_xlsx(out, output_path)

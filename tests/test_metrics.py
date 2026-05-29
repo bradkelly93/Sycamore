@@ -97,10 +97,27 @@ def test_net_debt_and_leverage():
     ff = _ff(INDUSTRIAL_ROWS)
     nd_23 = net_debt_fy(ff).iloc[-1]                                     # 500-80 = 420
     assert nd_23 == pytest.approx(420.0)
-    # net debt / "EBITDA" (proxy = OpInc) = 420 / 260
+    # No D&A in this fixture → EBITDA falls back to EBIT (260): 420 / 260.
     assert net_debt_to_ebitda_fy(ff).iloc[-1] == pytest.approx(420 / 260)
     # Interest coverage = 260 / 20 = 13x
     assert interest_coverage_fy(ff).iloc[-1] == pytest.approx(13.0)
+
+
+def test_ebitda_falls_back_to_ebit_without_dna():
+    ff = _ff(INDUSTRIAL_ROWS)
+    assert ebitda_fy(ff).iloc[-1] == pytest.approx(260.0)  # EBIT only
+
+
+def test_ebitda_adds_back_dna_when_present():
+    rows = INDUSTRIAL_ROWS + [
+        {"concept": "DepreciationAndAmortization", "period": "2022-12-31", "value": 50.0, "fy": 2022},
+        {"concept": "DepreciationAndAmortization", "period": "2023-12-31", "value": 60.0, "fy": 2023},
+    ]
+    ff = _ff(rows)
+    # EBITDA 2023 = EBIT 260 + D&A 60 = 320.
+    assert ebitda_fy(ff).iloc[-1] == pytest.approx(320.0)
+    # net debt / EBITDA now uses the real add-back: 420 / 320.
+    assert net_debt_to_ebitda_fy(ff).iloc[-1] == pytest.approx(420 / 320)
 
 
 def test_roic_and_roe_use_average_capital():

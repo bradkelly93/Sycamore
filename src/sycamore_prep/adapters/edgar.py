@@ -61,6 +61,11 @@ CANONICAL_CONCEPTS: dict[str, list[str]] = {
     # Cash flow
     "OperatingCashFlow":       ["NetCashProvidedByUsedInOperatingActivities"],
     "CapEx":                   ["PaymentsToAcquirePropertyPlantAndEquipment"],
+    "DepreciationAndAmortization": ["DepreciationDepletionAndAmortization",
+                                    "DepreciationAmortizationAndAccretionNet",
+                                    "DepreciationAndAmortization",
+                                    "DepreciationAmortizationAndDepletionNet",
+                                    "Depreciation"],
     "Dividends":               ["PaymentsOfDividends", "PaymentsOfDividendsCommonStock"],
 
     # Shares

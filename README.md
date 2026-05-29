@@ -61,14 +61,13 @@ See `CLAUDE.md` for the repo map and operating principles.
 ### Phase 2 — Screener
 
 Run the three-attribute quality-value screen. By default it pulls market
-caps from yfinance and excludes names that trip Sycamore's negative-space
-filters (no/low FCF, extreme multiples, very high leverage):
+caps from yfinance:
 
 ```bash
 sycamore-prep screen CW WES UMBF LECO MTDR
 sycamore-prep screen --sector banks --limit 50
-sycamore-prep screen --skip-market-cap            # quality + improving only
-sycamore-prep screen --include-negative-space     # see what got filtered
+sycamore-prep screen --skip-market-cap                 # quality + improving only
+sycamore-prep screen --hard-exclude-negative-space     # drop flagged names from the rank
 ```
 
 Output (`data/cache/screener_output.xlsx`) reports — **for every name** —
@@ -76,6 +75,20 @@ the three sub-scores **separately** (Q1 Quality, Q2 Valuation, Q3 Improving
 Fundamentals) plus the raw components and the negative-space flags. The
 composite rank is the sort key only; per `CLAUDE.md` the toolkit never
 collapses the three attributes into one opaque number.
+
+**Negative-space handling.** Names that trip a Sycamore-style red flag
+(no/low FCF, extreme P/E, extreme EV/EBITDA, high leverage for non-banks)
+are **kept in the output by default** with all three sub-scores visible —
+just flagged in the `ns_flags` column and sorted to the bottom. This keeps
+the three-axis decomposition intact (you can still see a great business that
+happens to be priced rich). Pass `--hard-exclude-negative-space` to remove
+them from the ranking entirely.
+
+EBITDA is computed as EBIT + D&A from the cash-flow add-back. **If you
+pulled fundamentals before this was added, re-pull with
+`pull-fundamentals --refresh` so the D&A line populates** — otherwise
+EV/EBITDA and net-debt/EBITDA fall back to an EBIT-only proxy that
+over-states leverage for D&A-heavy businesses (midstream, industrials).
 
 ## Notes on the remote execution sandbox
 

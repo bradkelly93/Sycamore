@@ -27,16 +27,24 @@ def net_debt_fy(ff: FinancialsFrame) -> pd.Series:
 
 
 def ebitda_fy(ff: FinancialsFrame) -> pd.Series:
-    """EBITDA proxy = OperatingIncomeLoss + D&A.
+    """EBITDA = OperatingIncomeLoss + Depreciation & Amortization.
 
-    We don't have a clean D&A tag in our canonical set, so v1 returns just
-    OperatingIncome and labels it EBIT. Phase 3 will layer in a proper EBITDA
-    once we pull DepreciationAndAmortization. This is conservative — a higher
-    EBITDA would *lower* the debt ratio, so EBIT-based debt/EBITDA over-states
-    leverage, which is the right direction for a downside-first screen.
+    D&A is taken from the cash-flow add-back (reported positive in our
+    tagging). If the filer's D&A tag isn't in the cache (e.g., the parquet
+    predates the D&A concept), we fall back to EBIT alone and rename the
+    series so the basis is visible to the caller. Re-pull with --refresh
+    after upgrading to populate D&A.
+
+    Using EBIT alone materially over-states leverage and EV multiples for
+    D&A-heavy businesses (midstream, industrials), so the add-back matters.
     """
-    op = _series(ff, "OperatingIncomeLoss").rename("EBIT_as_EBITDA_proxy")
-    return op
+    op = _series(ff, "OperatingIncomeLoss")
+    if op.empty:
+        return pd.Series(dtype=float, name="EBITDA")
+    da = _series(ff, "DepreciationAndAmortization")
+    if da.empty:
+        return op.rename("EBITDA_proxy_EBIT_only")
+    return (op + da.reindex(op.index).fillna(0)).rename("EBITDA")
 
 
 def net_debt_to_ebitda_fy(ff: FinancialsFrame) -> pd.Series:
