@@ -53,6 +53,19 @@ def test_align_prices_respects_backward_tolerance():
     assert out.empty
 
 
+def test_align_prices_handles_mixed_datetime_resolution():
+    """Real cache path: parquet-loaded yfinance dates come back as
+    datetime64[us] while string FY-ends parse to a different unit; pandas 3.x
+    merge_asof rejects mismatched resolutions. The aligner must normalize both
+    sides. (A bdate_range fixture happens to match, so this guards the gap.)"""
+    # [s] like a parquet-loaded cache; string FY-ends parse to [us] in pandas 3.x.
+    dates = pd.to_datetime(["2022-12-29", "2022-12-30", "2023-06-30"]).astype("datetime64[s]")
+    prices = pd.DataFrame({"date": dates, "close": [100.0, 101.0, 201.0]})
+    out = align_prices_to_fy_ends(prices, ["2022-12-31", "2023-06-30"])
+    assert out["2022-12-31"] == 101.0
+    assert out["2023-06-30"] == 201.0
+
+
 # --------------------------------------------------------------------------- #
 # P/E band
 # --------------------------------------------------------------------------- #

@@ -81,10 +81,14 @@ def align_prices_to_fy_ends(
             px["date"] = px["date"].dt.tz_localize(None)
     except (AttributeError, TypeError):
         pass
+    # Force a common datetime resolution: parquet-loaded dates can be [s] or
+    # [us] while string FY-ends parse to [us]/[ns], and pandas 3.x merge_asof
+    # rejects mismatched resolutions. Normalize both sides to nanoseconds.
+    px["date"] = px["date"].astype("datetime64[ns]")
     px = px.dropna(subset=["date"]).sort_values("date")
 
     targets = pd.DataFrame({"period": list(period_ends)})
-    targets["dt"] = pd.to_datetime(targets["period"], errors="coerce")
+    targets["dt"] = pd.to_datetime(targets["period"], errors="coerce").astype("datetime64[ns]")
     targets = targets.dropna(subset=["dt"]).sort_values("dt")
     if px.empty or targets.empty:
         return pd.Series(dtype=float, name="FY_End_Price")
