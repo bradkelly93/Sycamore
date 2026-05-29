@@ -1,0 +1,164 @@
+"""Metric tests against hand-computed fixtures.
+
+Strategy: build a minimal FinancialsFrame by hand with known values, then
+verify each metric matches what we compute on paper.
+"""
+
+from __future__ import annotations
+
+import math
+
+import pandas as pd
+import pytest
+
+from sycamore_prep.adapters.base import FinancialsFrame
+from sycamore_prep.metrics import (
+    ebitda_fy,
+    fcf_margin_fy,
+    fcf_yield_fy,
+    free_cash_flow_fy,
+    gross_margin_fy,
+    interest_coverage_fy,
+    is_bank,
+    net_debt_fy,
+    net_debt_to_ebitda_fy,
+    nopat_fy,
+    pe_fy,
+    percentile_vs_history,
+    revenue_fy,
+    roe_fy,
+    roic_fy,
+    rotce_fy,
+    tangible_book_value_fy,
+)
+from sycamore_prep.metrics.profitability import invested_capital_fy
+
+
+def _ff(rows: list[dict]) -> FinancialsFrame:
+    """Helper: build a FinancialsFrame from concept/period/value tuples."""
+    base = {
+        "ticker": "TEST", "fy": None, "fp": "FY", "form": "10-K",
+        "unit": "USD", "source": "edgar (primary)",
+    }
+    expanded = [{**base, **r} for r in rows]
+    return FinancialsFrame(pd.DataFrame(expanded))
+
+
+# Two-year hand-computed industrial fixture --------------------------------- #
+# FY 2022: Rev=1000, COGS=600, OpInc=200, NI=120, IntExp=20
+#          LT Debt=400, ST Debt=100, Cash=50, Equity=800
+#          CFO=180, CapEx=40
+# FY 2023: Rev=1200, COGS=700, OpInc=260, NI=160, IntExp=20
+#          LT Debt=400, ST Debt=100, Cash=80, Equity=900
+#          CFO=220, CapEx=50
+
+INDUSTRIAL_ROWS = [
+    {"concept": "Revenues",                 "period": "2022-12-31", "value": 1000.0, "fy": 2022},
+    {"concept": "Revenues",                 "period": "2023-12-31", "value": 1200.0, "fy": 2023},
+    {"concept": "CostOfRevenue",            "period": "2022-12-31", "value": 600.0,  "fy": 2022},
+    {"concept": "CostOfRevenue",            "period": "2023-12-31", "value": 700.0,  "fy": 2023},
+    {"concept": "OperatingIncomeLoss",      "period": "2022-12-31", "value": 200.0,  "fy": 2022},
+    {"concept": "OperatingIncomeLoss",      "period": "2023-12-31", "value": 260.0,  "fy": 2023},
+    {"concept": "NetIncomeLoss",            "period": "2022-12-31", "value": 120.0,  "fy": 2022},
+    {"concept": "NetIncomeLoss",            "period": "2023-12-31", "value": 160.0,  "fy": 2023},
+    {"concept": "InterestExpense",          "period": "2022-12-31", "value": 20.0,   "fy": 2022},
+    {"concept": "InterestExpense",          "period": "2023-12-31", "value": 20.0,   "fy": 2023},
+    {"concept": "LongTermDebt",             "period": "2022-12-31", "value": 400.0,  "fy": 2022},
+    {"concept": "LongTermDebt",             "period": "2023-12-31", "value": 400.0,  "fy": 2023},
+    {"concept": "ShortTermDebt",            "period": "2022-12-31", "value": 100.0,  "fy": 2022},
+    {"concept": "ShortTermDebt",            "period": "2023-12-31", "value": 100.0,  "fy": 2023},
+    {"concept": "CashAndEquivalents",       "period": "2022-12-31", "value": 50.0,   "fy": 2022},
+    {"concept": "CashAndEquivalents",       "period": "2023-12-31", "value": 80.0,   "fy": 2023},
+    {"concept": "StockholdersEquity",       "period": "2022-12-31", "value": 800.0,  "fy": 2022},
+    {"concept": "StockholdersEquity",       "period": "2023-12-31", "value": 900.0,  "fy": 2023},
+    {"concept": "OperatingCashFlow",        "period": "2022-12-31", "value": 180.0,  "fy": 2022},
+    {"concept": "OperatingCashFlow",        "period": "2023-12-31", "value": 220.0,  "fy": 2023},
+    {"concept": "CapEx",                    "period": "2022-12-31", "value": 40.0,   "fy": 2022},
+    {"concept": "CapEx",                    "period": "2023-12-31", "value": 50.0,   "fy": 2023},
+]
+
+
+def test_revenue_and_margins():
+    ff = _ff(INDUSTRIAL_ROWS)
+    assert revenue_fy(ff).iloc[-1] == 1200.0
+    # GM 2023 = (1200-700)/1200 = 0.41667
+    assert gross_margin_fy(ff).iloc[-1] == pytest.approx(500 / 1200)
+
+
+def test_free_cash_flow_and_margin_and_yield():
+    ff = _ff(INDUSTRIAL_ROWS)
+    assert free_cash_flow_fy(ff).iloc[-1] == pytest.approx(170.0)        # 220-50
+    assert fcf_margin_fy(ff).iloc[-1] == pytest.approx(170 / 1200)
+    # FCF yield at $2bn market cap = 170/2000 = 8.5%
+    assert fcf_yield_fy(ff, market_cap=2000).iloc[0] == pytest.approx(0.085)
+
+
+def test_net_debt_and_leverage():
+    ff = _ff(INDUSTRIAL_ROWS)
+    nd_23 = net_debt_fy(ff).iloc[-1]                                     # 500-80 = 420
+    assert nd_23 == pytest.approx(420.0)
+    # net debt / "EBITDA" (proxy = OpInc) = 420 / 260
+    assert net_debt_to_ebitda_fy(ff).iloc[-1] == pytest.approx(420 / 260)
+    # Interest coverage = 260 / 20 = 13x
+    assert interest_coverage_fy(ff).iloc[-1] == pytest.approx(13.0)
+
+
+def test_roic_and_roe_use_average_capital():
+    ff = _ff(INDUSTRIAL_ROWS)
+    # NOPAT 2023 = 260 * (1 - 0.21) = 205.4
+    # IC 2022 = 400 + 100 + 800 - 50 = 1250
+    # IC 2023 = 400 + 100 + 900 - 80 = 1320
+    # avg IC = 1285 → ROIC = 205.4 / 1285 ≈ 0.1599
+    expected_roic = (260 * 0.79) / ((1250 + 1320) / 2)
+    assert roic_fy(ff).iloc[-1] == pytest.approx(expected_roic, rel=1e-6)
+    # ROE 2023 = 160 / avg(800, 900) = 160 / 850
+    assert roe_fy(ff).iloc[-1] == pytest.approx(160 / 850)
+
+
+def test_pe_handles_negative_earnings():
+    rows = INDUSTRIAL_ROWS + [
+        {"concept": "NetIncomeLoss", "period": "2024-12-31", "value": -10.0, "fy": 2024},
+    ]
+    ff = _ff(rows)
+    pe = pe_fy(ff, market_cap=2000)
+    # Most-recent NI is negative → NaN
+    assert math.isnan(pe.iloc[-1])
+
+
+# --- Bank fixture --------------------------------------------------------- #
+BANK_ROWS = [
+    {"concept": "NetIncomeLoss",            "period": "2022-12-31", "value": 300.0, "fy": 2022},
+    {"concept": "NetIncomeLoss",            "period": "2023-12-31", "value": 350.0, "fy": 2023},
+    {"concept": "StockholdersEquity",       "period": "2022-12-31", "value": 3000.0, "fy": 2022},
+    {"concept": "StockholdersEquity",       "period": "2023-12-31", "value": 3200.0, "fy": 2023},
+    {"concept": "Goodwill",                 "period": "2022-12-31", "value": 400.0, "fy": 2022},
+    {"concept": "Goodwill",                 "period": "2023-12-31", "value": 400.0, "fy": 2023},
+    {"concept": "IntangibleAssetsNet",      "period": "2022-12-31", "value": 100.0, "fy": 2022},
+    {"concept": "IntangibleAssetsNet",      "period": "2023-12-31", "value": 100.0, "fy": 2023},
+    {"concept": "NetInterestIncome",        "period": "2023-12-31", "value": 500.0, "fy": 2023},
+    {"concept": "Assets",                   "period": "2022-12-31", "value": 40000.0, "fy": 2022},
+    {"concept": "Assets",                   "period": "2023-12-31", "value": 42000.0, "fy": 2023},
+]
+
+
+def test_is_bank_detection():
+    assert is_bank(_ff(BANK_ROWS)) is True
+    assert is_bank(_ff(INDUSTRIAL_ROWS)) is False
+
+
+def test_rotce_and_tbv():
+    ff = _ff(BANK_ROWS)
+    # TCE 2022 = 3000-400-100 = 2500; TCE 2023 = 3200-400-100 = 2700; avg=2600
+    # ROTCE 2023 = 350 / 2600 ≈ 0.1346
+    assert rotce_fy(ff).iloc[-1] == pytest.approx(350 / 2600)
+    assert tangible_book_value_fy(ff).iloc[-1] == pytest.approx(2700.0)
+
+
+def test_percentile_vs_history():
+    # 10 historical observations, current at the high end
+    hist = pd.Series([0.04, 0.05, 0.06, 0.07, 0.08, 0.09, 0.10, 0.11, 0.12, 0.13])
+    assert percentile_vs_history(hist, 0.13) == pytest.approx(95.0)   # tied at top
+    assert percentile_vs_history(hist, 0.04) == pytest.approx(5.0)    # tied at bottom
+    assert percentile_vs_history(hist, 0.08) == pytest.approx(45.0)
+    # Too few observations → NaN
+    assert math.isnan(percentile_vs_history(pd.Series([0.05, 0.06]), 0.05))

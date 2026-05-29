@@ -8,6 +8,7 @@ import typer
 
 from .adapters import EdgarProvider
 from .config import cache_dir, load_config
+from .screener import run_screener
 from .universe.builder import build_universe, load_universe
 
 
@@ -91,6 +92,48 @@ def show_universe(
     if sycamore_only:
         df = df[df["owned_by_sycamore"]]
     typer.echo(df.head(n).to_string(index=False))
+
+
+@app.command("screen")
+def screen_cmd(
+    tickers: list[str] = typer.Argument(
+        None, help="Optional explicit tickers; if omitted, runs against the cached universe."
+    ),
+    sector: str = typer.Option(
+        None, "--sector", help="Filter universe by GICS sector substring (e.g., 'banks', 'industrials')."
+    ),
+    limit: int = typer.Option(None, "--limit", help="Cap candidate count (useful for first runs)."),
+    output: Path = typer.Option(None, "--output", "-o", help="Custom xlsx output path."),
+    skip_market_cap: bool = typer.Option(
+        False, "--skip-market-cap",
+        help="Skip yfinance market-cap fetch; quality + improving scores only.",
+    ),
+    include_neg_space: bool = typer.Option(
+        False, "--include-negative-space",
+        help="Don't exclude names that trip Sycamore's negative-space filters.",
+    ),
+) -> None:
+    """Run the three-attribute quality-value screener.
+
+    Sub-scores (Q1 Quality, Q2 Valuation, Q3 Improving Fundamentals) are
+    reported separately per CLAUDE.md — composite_rank is only the sort key.
+    """
+    df = run_screener(
+        tickers=tickers or None,
+        sector=sector,
+        limit=limit,
+        output_path=output,
+        skip_market_cap=skip_market_cap,
+        exclude_neg_space=not include_neg_space,
+    )
+    out = output or (cache_dir() / "screener_output.xlsx")
+    typer.secho(f"Scored {len(df)} tickers → {out}", fg=typer.colors.GREEN)
+    cols_to_show = [c for c in [
+        "name", "composite_rank", "q1_quality_score",
+        "q2_valuation_score", "q3_improving_score",
+        "excluded_negative_space", "ns_flags",
+    ] if c in df.columns]
+    typer.echo(df[cols_to_show].head(20).to_string())
 
 
 @app.command("config-check")

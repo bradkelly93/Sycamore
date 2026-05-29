@@ -58,6 +58,25 @@ a `source` column on every row.
 
 See `CLAUDE.md` for the repo map and operating principles.
 
+### Phase 2 — Screener
+
+Run the three-attribute quality-value screen. By default it pulls market
+caps from yfinance and excludes names that trip Sycamore's negative-space
+filters (no/low FCF, extreme multiples, very high leverage):
+
+```bash
+sycamore-prep screen CW WES UMBF LECO MTDR
+sycamore-prep screen --sector banks --limit 50
+sycamore-prep screen --skip-market-cap            # quality + improving only
+sycamore-prep screen --include-negative-space     # see what got filtered
+```
+
+Output (`data/cache/screener_output.xlsx`) reports — **for every name** —
+the three sub-scores **separately** (Q1 Quality, Q2 Valuation, Q3 Improving
+Fundamentals) plus the raw components and the negative-space flags. The
+composite rank is the sort key only; per `CLAUDE.md` the toolkit never
+collapses the three attributes into one opaque number.
+
 ## Notes on the remote execution sandbox
 
 The Claude Code on the web container's egress policy blocks
