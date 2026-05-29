@@ -10,6 +10,7 @@ from .adapters import EdgarProvider
 from .comps import run_comps
 from .config import cache_dir, load_config
 from .screener import run_screener
+from .spinoffs.tracker import load_tracker, run_scan, run_track
 from .universe.builder import build_universe, load_universe
 
 
@@ -188,6 +189,92 @@ def comps_cmd(
                    + (f"  |  margin of safety {mos * 100:.1f}%" if mos == mos else ""))
     elif s.is_bank:
         typer.echo("  reverse DCF: N/A (bank)")
+
+
+spin_app = typer.Typer(
+    no_args_is_help=True,
+    help="Spin-off tracker (special-situations value). Downside-first; the three "
+         "attributes are reported separately. See CLAUDE.md.",
+)
+app.add_typer(spin_app, name="spinoffs")
+
+
+@spin_app.command("scan")
+def spinoffs_scan(
+    lookback_days: int = typer.Option(
+        None, "--lookback-days", help="Window for recent 10-12B filings (default config)."
+    ),
+    forms: str = typer.Option(None, "--forms", help="Comma-separated forms (default config: 10-12B)."),
+    query: str = typer.Option(None, "--query", help="Full-text query (default config)."),
+    limit: int = typer.Option(None, "--limit", help="Cap candidate count."),
+    output: Path = typer.Option(None, "--output", "-o", help="Custom xlsx path (.md alongside)."),
+    refresh: bool = typer.Option(False, "--refresh", help="Bypass caches; re-hit EDGAR."),
+) -> None:
+    """Scan recent Form 10 / 10-12B registrations market-wide (discovery).
+
+    Broad + fast: metadata + status only. Run `spinoffs track` for a SpinCo's
+    leverage/quality flags.
+    """
+    form_list = [f.strip() for f in forms.split(",") if f.strip()] if forms else None
+    res = run_scan(forms=form_list, lookback_days=lookback_days, query=query,
+                   limit=limit, output_path=output, refresh=refresh)
+    typer.secho(
+        f"Found {len(res.records)} Form-10 registrations → {res.xlsx_path}",
+        fg=typer.colors.GREEN,
+    )
+    typer.echo(f"  markdown → {res.md_path}")
+    cols = [c for c in ["spinco_name", "spinco_ticker", "status",
+                        "first_form10_date", "amendment_count", "sic"] if c in res.df.columns]
+    if not res.df.empty:
+        typer.echo(res.df[cols].head(25).to_string())
+
+
+@spin_app.command("track")
+def spinoffs_track(
+    parent: str = typer.Argument(..., help="Parent ticker (e.g., DHR, MMM)."),
+    spinco: str = typer.Option(
+        None, "--spinco", help="SpinCo ticker or CIK for deterministic linkage."
+    ),
+    output: Path = typer.Option(None, "--output", "-o", help="Custom xlsx path (.md alongside)."),
+    no_softfields: bool = typer.Option(
+        False, "--no-softfields", help="Skip parsing the 10-12B for ratio/dates."
+    ),
+    refresh: bool = typer.Option(False, "--refresh", help="Bypass caches; re-hit EDGAR."),
+) -> None:
+    """Track a parent's spin-off: leverage/quality flags + soft fields.
+
+    The three attributes (better business / valuation disparity / improving
+    fundamentals) are reported separately; downside flags + 'review' prompts
+    surface first. Writes spinoffs_<PARENT>.xlsx and .md.
+    """
+    res = run_track(parent, spinco=spinco, output_path=output, refresh=refresh,
+                    fetch_softfields=not no_softfields)
+    typer.secho(
+        f"Tracked {len(res.records)} spin(s) for {parent.upper()} → {res.xlsx_path}",
+        fg=typer.colors.GREEN,
+    )
+    typer.echo(f"  markdown tear-sheet → {res.md_path}")
+    for r in res.records:
+        ds = ", ".join(r.downside_flags) if r.downside_flags else "none computed"
+        typer.echo(f"  {r.spinco_name or r.spinco_ticker or r.spinco_cik} "
+                   f"[{r.status}]  downside: {ds}")
+        if r.error:
+            typer.secho(f"    WARNING: {r.error}", fg=typer.colors.YELLOW)
+
+
+@spin_app.command("show")
+def spinoffs_show(
+    n: int = typer.Option(25, "--n", help="Rows to print."),
+) -> None:
+    """Print the last scan/track result frame (cached)."""
+    df = load_tracker()
+    if df is None or df.empty:
+        typer.secho("No cached tracker output. Run `spinoffs scan` or `spinoffs track` first.",
+                    fg=typer.colors.YELLOW)
+        raise typer.Exit(code=1)
+    cols = [c for c in ["spinco", "spinco_ticker", "status", "downside_flags",
+                        "first_form10_date", "distribution_ratio"] if c in df.columns]
+    typer.echo(df[cols].head(n).to_string(index=False))
 
 
 @app.command("config-check")

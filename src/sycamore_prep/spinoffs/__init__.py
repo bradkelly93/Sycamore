@@ -13,6 +13,7 @@ from .discovery import (
     track_parent,
 )
 from .flags import DOWNSIDE_THRESHOLDS, apply_flags
+from .tracker import TrackerResult, load_tracker, run_scan, run_track
 
 __all__ = [
     "SpinoffRecord",
@@ -22,4 +23,8 @@ __all__ = [
     "status_from_submissions",
     "apply_flags",
     "DOWNSIDE_THRESHOLDS",
+    "TrackerResult",
+    "run_scan",
+    "run_track",
+    "load_tracker",
 ]

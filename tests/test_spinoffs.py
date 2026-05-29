@@ -15,13 +15,15 @@ import pytest
 from sycamore_prep.adapters import cache as cache_mod
 from sycamore_prep.adapters.base import FinancialsFrame
 from sycamore_prep.adapters.edgar import EdgarProvider
-from sycamore_prep.spinoffs import apply_flags, scan_recent_form10s, track_parent
+from sycamore_prep.spinoffs import apply_flags, scan_recent_form10s, softfields, track_parent
 from sycamore_prep.spinoffs.discovery import (
     SpinoffRecord,
     Status,
     _record_from_submissions,
     status_from_submissions,
 )
+from sycamore_prep.spinoffs.report import records_to_df, write_tracker_md, write_tracker_xlsx
+from sycamore_prep.spinoffs.tracker import run_track
 
 FIXTURE_DIR = Path(__file__).parent / "fixtures"
 
@@ -43,6 +45,30 @@ def _ff(series_by_concept: dict[str, list[tuple[str, float]]]) -> FinancialsFram
                 "period_start": f"{yr - 1}-12-31", "period_days": 365,
             })
     return FinancialsFrame(pd.DataFrame(rows))
+
+
+# A high-leverage, declining, negative-equity SpinCo — trips every computable
+# downside flag. Reused by the flag, report and end-to-end tests.
+_LEVERED_FF = _ff({
+    "Revenues": [("2021-12-31", 1050), ("2022-12-31", 1000),
+                 ("2023-12-31", 950), ("2024-12-31", 900)],
+    "OperatingIncomeLoss": [("2022-12-31", 100), ("2023-12-31", 90), ("2024-12-31", 80)],
+    "InterestExpense": [("2022-12-31", 40), ("2023-12-31", 45), ("2024-12-31", 50)],
+    "DepreciationAndAmortization": [("2022-12-31", 50), ("2023-12-31", 50), ("2024-12-31", 50)],
+    "LongTermDebt": [("2022-12-31", 600), ("2023-12-31", 600), ("2024-12-31", 600)],
+    "CashAndEquivalents": [("2022-12-31", 50), ("2023-12-31", 50), ("2024-12-31", 50)],
+    "StockholdersEquity": [("2022-12-31", 30), ("2023-12-31", 5), ("2024-12-31", -20)],
+    "OperatingCashFlow": [("2022-12-31", 60), ("2023-12-31", 55), ("2024-12-31", 50)],
+    "CapEx": [("2022-12-31", 40), ("2023-12-31", 42), ("2024-12-31", 45)],
+})
+
+# A real-shape information statement (num-first ratio phrasing) for soft fields.
+_INFO_STMT = (
+    "Danaher will distribute to its shareholders one share of Veralto common "
+    "stock for every two shares of Danaher common stock held as of the record "
+    "date. The record date for the distribution is September 13, 2023. The "
+    "distribution date is expected to be September 30, 2023."
+)
 
 
 @pytest.fixture
@@ -164,3 +190,103 @@ def test_track_parent_explicit_spinco(provider: EdgarProvider):
     assert rec.status == Status.COMPLETED.value
     assert rec.amendment_count == 1
     assert rec.sources == "edgar (primary)"
+
+
+# --------------------------------------------------------------------------- #
+# soft-field extractor (fail-safe)
+# --------------------------------------------------------------------------- #
+
+def test_softfields_extracts_clear_terms():
+    sf = softfields.extract(_INFO_STMT)
+    assert sf.distribution_ratio == "1:2"
+    assert sf.record_date == "2023-09-13"
+    assert sf.distribution_date == "2023-09-30"
+    assert sf.source == "derived (parsed 10-12B)"
+
+
+def test_softfields_failsafe_on_no_match():
+    sf = softfields.extract("This document discusses governance and contains no spin terms.")
+    assert sf.distribution_ratio is None
+    assert sf.record_date is None and sf.distribution_date is None
+    assert sf.source is None
+
+
+def test_softfields_ambiguous_ratio_is_pending():
+    txt = ("one share for every two shares of Parent held. Separately, one share "
+           "for every three shares of Parent held.")
+    assert softfields.extract(txt).distribution_ratio is None  # conflicting -> pending
+
+
+# --------------------------------------------------------------------------- #
+# report
+# --------------------------------------------------------------------------- #
+
+def test_report_renders_pending_and_writes(tmp_path: Path):
+    from types import SimpleNamespace
+
+    from openpyxl import load_workbook
+
+    levered = apply_flags(
+        SpinoffRecord(spinco_name="LeveredCo", spinco_ticker="LVR", status="completed"),
+        _LEVERED_FF,
+    )
+    levered.q2_valuation_disparity = "trades as LVR; run `comps LVR`"
+    pending = SpinoffRecord(spinco_name="FreshCo", status="form-10-filed",
+                            q1_better_business="pending", q3_improving_fundamentals="pending")
+    df = records_to_df([levered, pending])
+    assert {"downside_flags", "q1_better_business", "q2_valuation_disparity",
+            "q3_improving_fundamentals"}.issubset(df.columns)
+
+    result = SimpleNamespace(records=[levered, pending], df=df, mode="track")
+    write_tracker_xlsx(result, tmp_path / "t.xlsx")
+    write_tracker_md(result, tmp_path / "t.md")
+    assert (tmp_path / "t.xlsx").exists()
+    md = (tmp_path / "t.md").read_text()
+    assert "Downside flags" in md and "pending" in md
+
+    wb = load_workbook(tmp_path / "t.xlsx")
+    assert {"tracker", "downside_flags", "spinco_financials", "filings", "sources"}.issubset(
+        set(wb.sheetnames)
+    )
+
+
+# --------------------------------------------------------------------------- #
+# tracker end-to-end (offline)
+# --------------------------------------------------------------------------- #
+
+def test_run_track_end_to_end(tmp_path: Path, monkeypatch):
+    subs = _load("submissions_min.json")
+    ticker_map = {
+        "0": {"cik_str": 313616, "ticker": "DHR", "title": "DANAHER CORP /DE/"},
+        "1": {"cik_str": 1964738, "ticker": "SOLV", "title": "Solventum Corp"},
+    }
+
+    def fake_get(self, url: str):  # noqa: ARG001
+        if "company_tickers.json" in url:
+            return ticker_map
+        if "submissions/CIK" in url:
+            return subs
+        raise AssertionError(f"Unexpected URL in test: {url}")
+
+    monkeypatch.setattr(EdgarProvider, "_get", fake_get)
+    monkeypatch.setattr(cache_mod, "cache_dir", lambda: tmp_path)
+    monkeypatch.setattr(EdgarProvider, "get_financials",
+                        lambda self, ticker, use_cache=True: _LEVERED_FF)
+    monkeypatch.setattr(EdgarProvider, "get_filing_text",
+                        lambda self, url, use_cache=True: _INFO_STMT)
+
+    res = run_track("DHR", spinco="SOLV", output_path=tmp_path / "sp.xlsx")
+
+    assert (tmp_path / "sp.xlsx").exists() and (tmp_path / "sp.md").exists()
+    assert len(res.records) == 1
+    r = res.records[0]
+    assert r.parent_ticker == "DHR" and r.spinco_ticker == "SOLV"
+    assert r.status == Status.COMPLETED.value
+    assert "high_leverage" in r.downside_flags
+    # soft fields parsed from the (mocked) information statement
+    assert r.distribution_ratio == "1:2"
+    assert r.record_date == "2023-09-13" and r.distribution_date == "2023-09-30"
+    # both source tags present; three attributes reported separately
+    assert "edgar (primary)" in r.sources and "derived (parsed 10-12B)" in r.sources
+    assert r.q2_valuation_disparity.startswith("trades as SOLV")
+    assert r.review_flags  # qualitative "read the Form 10" prompts present

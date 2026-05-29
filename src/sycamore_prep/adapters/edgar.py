@@ -268,6 +268,26 @@ class EdgarProvider(FundamentalsProvider, FilingsProvider):
                 break
         return {"hits": {"hits": hits, "total": {"value": total or len(hits)}}}
 
+    def get_filing_text(self, url: str, *, use_cache: bool = True) -> str:
+        """Fetch a filing document (HTML/text) for soft-field extraction.
+
+        Cached to data/cache as text keyed by the URL hash so the (large)
+        information statement is pulled once and replayable offline.
+        """
+        key = "doc_" + hashlib.md5(url.encode()).hexdigest()[:16]
+        cached = cache.load_text(key) if use_cache else None
+        if cached is not None:
+            return cached
+        self._throttle()
+        host = "www.sec.gov" if "www.sec.gov" in url else "data.sec.gov"
+        resp = self._session.get(
+            url, headers={"User-Agent": self._ua, "Host": host}, timeout=60
+        )
+        resp.raise_for_status()
+        text = resp.text
+        cache.save_text(key, text)
+        return text
+
 
 # --------------------------------------------------------------------------- #
 # Parsing

@@ -142,13 +142,64 @@ ASC-606 basis instead of a deprecated tag). **Re-pull with
 `pull-fundamentals --refresh` before running comps** so cached parquets are
 rebuilt — otherwise revenue-based figures may reflect a stale tag.
 
+### Phase 4 — Spin-Off Tracker
+
+Spin-offs are a classic special-situations *value* source: index/ETF funds are
+forced to dump the orphaned SpinCo, creating temporary mispricing — but they
+are also value traps when the parent loads the SpinCo with debt, pension, or
+litigation. The tracker is **downside-first** (leverage / asset-quality /
+"why was this spun" surfaced at least as prominently as upside) and decomposes
+into the three attributes **separately** — never one opaque score.
+
+```bash
+sycamore-prep spinoffs scan                              # recent 10-12B registrations, market-wide
+sycamore-prep spinoffs scan --lookback-days 730 --limit 50
+sycamore-prep spinoffs track DHR --spinco VLTO           # deterministic parent↔SpinCo linkage
+sycamore-prep spinoffs track MMM --spinco SOLV
+sycamore-prep spinoffs show                              # reprint the last run (cached)
+```
+
+Two modes, both behind the swappable adapter layer (a new `FilingsProvider`
+covering the EDGAR **submissions API** + **full-text search**):
+
+- **`scan`** — broad, fast discovery via EDGAR full-text search for the Form 10
+  family (`10-12B` + `/A`). One row per SpinCo (grouped by CIK) with status,
+  amendment count, SIC, and the filing link. Metadata only (no per-SpinCo
+  fundamentals) to respect SEC rate limits.
+- **`track <PARENT>`** — deep-dive. Resolves the SpinCo (use `--spinco` for a
+  deterministic link), pulls its primary-source XBRL **through the synonym-aware
+  `get_financials`**, and computes the three-attribute / downside read.
+
+Outputs `data/cache/spinoffs_<PARENT>.xlsx` (tabs: `tracker`, `downside_flags`,
+`spinco_financials`, `filings`, `sources`) and a markdown tear-sheet alongside.
+
+- **Downside flags** (computed from XBRL when the SpinCo has filed a 10-K):
+  `high_leverage` (net debt/EBITDA > 4), `thin_interest_coverage` (< 3×),
+  `negative_equity`, `negative_or_thin_fcf`, `declining_revenue`, plus the
+  `forced_selling_window` around the distribution date.
+- **Review prompts** that can't be machine-read are surfaced with the Form 10
+  link rather than guessed: *why spun*, *pension / litigation / debt transfer*.
+- **Distribution ratio + record/distribution dates** are parsed from the
+  10-12B information statement **only when unambiguous** (tagged
+  `derived (parsed 10-12B)`); otherwise they render **`pending`** with the
+  filing link — never a guessed value.
+- A freshly-registered SpinCo with no XBRL yet renders leverage/quality as
+  **`pending`**, never `0`. Every row is source-tagged and traceable to an
+  accession.
+
+> **Network.** `scan` and the `track` enrichment hit `*.sec.gov` /
+> `efts.sec.gov`, so run them on a host where SEC is reachable (see the sandbox
+> note below). The discovery, flag, report, and parsing logic are fully
+> offline-tested.
+
 ## Notes on the remote execution sandbox
 
 The Claude Code on the web container's egress policy blocks
-`www.sec.gov` and `data.sec.gov`. The EDGAR adapter is fully wired up, but
-`pull-fundamentals` must be run on a host where SEC endpoints are reachable
-(your laptop, or with a network policy that allows SEC). The universe
-builder, tests, and Excel scaffolds work offline.
+`www.sec.gov`, `data.sec.gov`, and `efts.sec.gov`. The EDGAR adapter (incl. the
+spin-off submissions + full-text-search surface) is fully wired up, but
+`pull-fundamentals` and `spinoffs scan` / `track` must be run on a host where
+SEC endpoints are reachable (your laptop, or with a network policy that allows
+SEC). The universe builder, tests, and Excel scaffolds work offline.
 
 ## Non-goals
 

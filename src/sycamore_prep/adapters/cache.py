@@ -89,3 +89,20 @@ def load_df(key: str) -> pd.DataFrame | None:
     if not p.exists():
         return None
     return pd.read_parquet(p)
+
+
+def _text_path(key: str) -> Path:
+    return cache_dir() / f"{key}.txt"
+
+
+def save_text(key: str, text: str) -> Path:
+    p = _text_path(key)
+    p.write_text(text, encoding="utf-8")
+    return p
+
+
+def load_text(key: str) -> str | None:
+    p = _text_path(key)
+    if not p.exists():
+        return None
+    return p.read_text(encoding="utf-8")

@@ -197,12 +197,14 @@ def scan_recent_form10s(
     lookback_days: int,
     query: str,
     limit: int | None = None,
+    use_cache: bool = True,
 ) -> list[SpinoffRecord]:
     """Market-wide discovery of recent Form 10 (10-12B) registrations."""
     end = date.today()
     start = end - timedelta(days=lookback_days)
     hits = edgar.search_filings(
-        forms=forms, query=query, start=start.isoformat(), end=end.isoformat()
+        forms=forms, query=query, start=start.isoformat(), end=end.isoformat(),
+        use_cache=use_cache,
     )
     recs = _records_from_search(hits)
     recs.sort(key=lambda r: (r.first_form10_date or ""), reverse=True)
@@ -217,6 +219,7 @@ def track_parent(
     forms: list[str] | None = None,
     query: str | None = None,
     lookback_days: int = 1825,
+    use_cache: bool = True,
 ) -> list[SpinoffRecord]:
     """Track a named parent's spin-off(s).
 
@@ -241,14 +244,15 @@ def track_parent(
                 sc_name, sc_cik, sc_ticker = m.name, m.cik, spinco.upper()
             except Exception:  # noqa: BLE001 — fall back to submissions
                 pass
-        subs = edgar.get_submissions(spinco)
+        subs = edgar.get_submissions(spinco, use_cache=use_cache)
         recs = [_record_from_submissions(subs, sc_name, sc_cik, sc_ticker)]
     else:
         q = query or p_name.split()[0].title()
         end = date.today()
         start = end - timedelta(days=lookback_days)
         hits = edgar.search_filings(
-            forms=forms, query=q, start=start.isoformat(), end=end.isoformat()
+            forms=forms, query=q, start=start.isoformat(), end=end.isoformat(),
+            use_cache=use_cache,
         )
         recs = _records_from_search(hits)
 
@@ -257,7 +261,9 @@ def track_parent(
         key = r.spinco_ticker or r.spinco_cik
         if spinco is None and key:
             try:
-                r.status = status_from_submissions(edgar.get_submissions(key), r.status)
+                r.status = status_from_submissions(
+                    edgar.get_submissions(key, use_cache=use_cache), r.status
+                )
             except Exception as exc:  # noqa: BLE001
                 r.error = f"submissions enrich failed: {exc}"
     return recs
