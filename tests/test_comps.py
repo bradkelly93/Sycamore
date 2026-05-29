@@ -119,6 +119,24 @@ def test_normalized_earnings_five_year_mean_and_trough():
     assert ne.trailing_pe == pytest.approx(14.0)                   # 35 / 2.50
 
 
+def test_normalized_earnings_subtracts_interest_before_tax():
+    # Flat 20% op margin on $1,000 revenue, $40 interest, 100 shares.
+    # norm op income = 200; pretax = 200 - 40 = 160; NI = 160 * 0.79 = 126.4.
+    years = ["2021-12-31", "2022-12-31", "2023-12-31", "2024-12-31", "2025-12-31"]
+    rows = []
+    for p in years:
+        rows.append({"concept": "Revenues", "period": p, "value": 1000.0})
+        rows.append({"concept": "OperatingIncomeLoss", "period": p, "value": 200.0})
+    rows.append({"concept": "InterestExpense", "period": "2025-12-31", "value": 40.0})
+    rows.append({"concept": "WeightedAverageSharesDiluted", "period": "2025-12-31",
+                 "value": 100.0, "unit": "shares"})
+    ne = normalized_earnings(_ff(rows), current_price=20.0, window=5, tax_rate=0.21)
+    assert ne.interest_expense == pytest.approx(40.0)
+    assert ne.normalized_op_income == pytest.approx(200.0)
+    assert ne.normalized_net_income == pytest.approx(126.4)   # (200 - 40) * 0.79
+    assert ne.normalized_eps == pytest.approx(1.264)
+
+
 def test_normalized_earnings_uses_available_window_when_short():
     years = ["2023-12-31", "2024-12-31", "2025-12-31"]
     rows = []
@@ -144,3 +162,120 @@ def test_shares_by_period_falls_back_to_implied_when_counts_absent():
     s, basis = shares_by_period(ff, basis="wad")
     assert basis == "NetIncome/EpsDiluted (implied)"
     assert s["2024-12-31"] == pytest.approx(100.0)   # 200 / 2
+
+
+# --------------------------------------------------------------------------- #
+# End-to-end offline run_comps (subject + a price-less peer + a failing peer)
+# --------------------------------------------------------------------------- #
+
+from sycamore_prep.adapters import cache as cache_mod          # noqa: E402
+from sycamore_prep.adapters import YFinanceProvider            # noqa: E402
+from sycamore_prep.adapters.edgar import EdgarProvider         # noqa: E402
+from sycamore_prep.comps import run_comps                      # noqa: E402
+
+_M = 1_000_000
+_YEARS = [2019, 2020, 2021, 2022, 2023, 2024]
+
+
+def _ann(vals, unit="USD"):
+    return {"units": {unit: [
+        {"start": f"{y}-01-01", "end": f"{y}-12-31", "val": v, "fy": y, "fp": "FY",
+         "form": "10-K", "filed": f"{y + 1}-02-15"}
+        for y, v in zip(_YEARS, vals)
+    ]}}
+
+
+def _company_facts(scale=1.0):
+    s = scale
+    return {"facts": {"us-gaap": {
+        "Revenues": _ann([v * _M * s for v in [1000, 1100, 1200, 1300, 1400, 1500]]),
+        "OperatingIncomeLoss": _ann([v * _M * s for v in [150, 170, 180, 210, 240, 270]]),
+        "NetIncomeLoss": _ann([v * _M * s for v in [100, 115, 120, 140, 160, 180]]),
+        "EarningsPerShareDiluted": _ann([4.0, 4.6, 4.8, 5.6, 6.4, 7.2], unit="USD/shares"),
+        "WeightedAverageNumberOfDilutedSharesOutstanding": _ann([25 * _M] * 6, unit="shares"),
+        "NetCashProvidedByUsedInOperatingActivities":
+            _ann([v * _M * s for v in [180, 200, 210, 240, 270, 300]]),
+        "PaymentsToAcquirePropertyPlantAndEquipment":
+            _ann([v * _M * s for v in [40, 45, 45, 50, 55, 60]]),
+        "DepreciationDepletionAndAmortization":
+            _ann([v * _M * s for v in [50, 52, 54, 56, 58, 60]]),
+        "LongTermDebt": _ann([400 * _M * s] * 6),
+        "CashAndCashEquivalentsAtCarryingValue": _ann([60 * _M * s] * 6),
+        "StockholdersEquity": _ann([v * _M * s for v in [800, 820, 860, 900, 960, 1020]]),
+    }}}
+
+
+def _fake_edgar_get(self, url: str):  # noqa: ARG001
+    if "company_tickers.json" in url:
+        return {"0": {"cik_str": 111, "ticker": "AAA", "title": "ALPHA INC"},
+                "1": {"cik_str": 222, "ticker": "BBB", "title": "BETA CORP"}}
+    if "CIK0000000111" in url:
+        return _company_facts(1.0)
+    if "CIK0000000222" in url:
+        return _company_facts(0.8)
+    raise AssertionError(f"unexpected url {url}")
+
+
+def _price_df():
+    dates = pd.bdate_range("2018-06-01", "2025-03-01")
+    close = np.linspace(20.0, 65.0, len(dates))
+    return pd.DataFrame({"date": dates, "close": close, "ticker": "X",
+                         "source": "yfinance (non-primary)"})
+
+
+@pytest.fixture
+def patched(tmp_path, monkeypatch):
+    monkeypatch.setattr(EdgarProvider, "_get", _fake_edgar_get)
+    monkeypatch.setattr(cache_mod, "cache_dir", lambda: tmp_path)
+    monkeypatch.setattr(YFinanceProvider, "get_market_cap",
+                        lambda self, t: {"AAA": 1.5e9, "BBB": 0.9e9}.get(t))
+    monkeypatch.setattr(YFinanceProvider, "get_current_price",
+                        lambda self, t: {"AAA": 60.0, "BBB": 40.0}.get(t))
+    # BBB has NO price history → its own-history bands must be NaN, not 0.
+    monkeypatch.setattr(YFinanceProvider, "get_prices",
+                        lambda self, t, start=None: pd.DataFrame() if t == "BBB" else _price_df())
+    return tmp_path
+
+
+def test_run_comps_end_to_end_offline(patched):
+    out = patched / "comps_AAA.xlsx"
+    res = run_comps("AAA", peers=["BBB", "CCC"], output_path=out)
+
+    # Both artifacts written.
+    assert out.exists()
+    assert out.with_suffix(".md").exists()
+
+    pt = res.peer_table
+    # Subject first, peers, then aggregate rows — failing peer kept, not dropped.
+    for tk in ["AAA", "BBB", "CCC", "PEER_MEDIAN", "PEER_MEAN"]:
+        assert tk in pt.index
+
+    # Sources tagged (CLAUDE.md #3).
+    assert "edgar (primary)" in res.subject.sources
+    assert "yfinance (non-primary)" in res.subject.sources
+
+    # Subject: three bands with real percentiles (>=3 FYs of prices).
+    bands = res.subject.history.bands
+    assert set(bands) == {"PE", "EV_EBITDA", "FCF_Yield"}
+    assert bands["PE"].n >= 3
+    assert pd.notna(bands["PE"].percentile_cheap)
+
+    # Reverse DCF present and ordered bear -> base -> bull (downside first).
+    assert [c.label for c in res.subject.dcf_cases] == ["bear", "base", "bull"]
+    assert res.subject.normalized is not None
+
+    # Missing data renders NaN, never silent 0: BBB has no prices.
+    assert pd.isna(pt.loc["BBB", "pe_pctile_own_hist"])
+    assert pd.notna(pt.loc["BBB", "pe"])            # current multiple still computed
+    # Failing peer CCC: visible error row, NaN metrics.
+    assert pt.loc["CCC", "error"]
+    assert pd.isna(pt.loc["CCC", "market_cap"])
+
+
+def test_run_comps_no_prices_flag_skips_bands_but_keeps_comps(patched):
+    res = run_comps("AAA", peers=["BBB"], output_path=patched / "comps_np.xlsx",
+                    fetch_prices=False)
+    # No prices → no own-history percentile, but current multiples + DCF still run.
+    assert pd.isna(res.subject.own_history_pctile("PE"))
+    assert pd.notna(res.subject.current.get("pe"))
+    assert [c.label for c in res.subject.dcf_cases] == ["bear", "base", "bull"]

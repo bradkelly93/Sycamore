@@ -7,9 +7,13 @@ anchor, so downside is visible alongside the mid-cycle figure (CLAUDE.md #1).
 
     norm_op_margin   = mean(OpInc_t / Rev_t over the last `window` FYs)
     norm_op_income   = norm_op_margin × Revenue_latest
-    norm_net_income  = norm_op_income × (1 − tax_rate)
+    norm_net_income  = (norm_op_income − interest_expense_latest) × (1 − tax_rate)
     norm_eps         = norm_net_income / diluted_shares_latest
     norm_pe          = current_price / norm_eps
+
+Interest expense is subtracted before tax so a levered name's normalized
+earnings aren't overstated (which would understate the normalized P/E and make
+the stock look cheaper than it is — against the downside-first principle).
 """
 
 from __future__ import annotations
@@ -29,6 +33,7 @@ class NormalizedEarnings:
     mean_op_margin: float
     trough_op_margin: float
     current_revenue: float
+    interest_expense: float
     normalized_op_income: float
     normalized_net_income: float
     normalized_eps: float
@@ -70,9 +75,12 @@ def normalized_earnings(
         shares = _series(ff, "SharesOutstanding").dropna()
     sh = float(shares.iloc[-1]) if not shares.empty else float("nan")
 
+    interest = _series(ff, "InterestExpense").dropna()
+    int_exp = float(interest.iloc[-1]) if not interest.empty else 0.0
+
     norm_oi = mean_m * cur_rev
-    norm_ni = norm_oi * (1.0 - tax_rate)
-    trough_ni = trough_m * cur_rev * (1.0 - tax_rate)
+    norm_ni = (norm_oi - int_exp) * (1.0 - tax_rate)
+    trough_ni = (trough_m * cur_rev - int_exp) * (1.0 - tax_rate)
     norm_eps = _safe_div(norm_ni, sh)
     trough_eps = _safe_div(trough_ni, sh)
 
@@ -85,6 +93,7 @@ def normalized_earnings(
         mean_op_margin=mean_m,
         trough_op_margin=trough_m,
         current_revenue=cur_rev,
+        interest_expense=int_exp,
         normalized_op_income=norm_oi,
         normalized_net_income=norm_ni,
         normalized_eps=norm_eps,
@@ -94,5 +103,5 @@ def normalized_earnings(
         trough_pe=_safe_div(current_price, trough_eps),
         trailing_pe=_safe_div(current_price, trail_eps),
         tax_rate=tax_rate,
-        basis="5y mean operating margin x current revenue",
+        basis="(5y mean op margin x current revenue - interest) x (1 - tax)",
     )

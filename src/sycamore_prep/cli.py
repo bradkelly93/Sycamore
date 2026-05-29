@@ -7,6 +7,7 @@ from pathlib import Path
 import typer
 
 from .adapters import EdgarProvider
+from .comps import run_comps
 from .config import cache_dir, load_config
 from .screener import run_screener
 from .universe.builder import build_universe, load_universe
@@ -135,6 +136,58 @@ def screen_cmd(
         "negative_space", "ns_flags",
     ] if c in df.columns]
     typer.echo(df[cols_to_show].head(20).to_string())
+
+
+@app.command("comps")
+def comps_cmd(
+    ticker: str = typer.Argument(..., help="Subject ticker (e.g., CW)."),
+    peers: str = typer.Option(
+        None, "--peers", help="Comma-separated peers; default from config.yaml peers map."
+    ),
+    wacc: float = typer.Option(None, "--wacc", help="Override WACC (default config valuation.wacc)."),
+    terminal_growth: float = typer.Option(
+        None, "--terminal-growth", help="Override perpetuity growth (default config)."
+    ),
+    years: int = typer.Option(None, "--years", help="Forecast horizon (default config forecast_years)."),
+    share_basis: str = typer.Option(
+        "wad", "--share-basis", help="Historical share basis: wad | shares_out | eps_implied."
+    ),
+    output: Path = typer.Option(
+        None, "--output", "-o", help="Custom xlsx path (the .md tear-sheet is written alongside)."
+    ),
+    no_prices: bool = typer.Option(
+        False, "--no-prices", help="Skip price fetch; own-history bands blank, comps still run."
+    ),
+    refresh: bool = typer.Option(False, "--refresh", help="Bypass caches; re-pull fundamentals + prices."),
+) -> None:
+    """Peer comps + own-history multiple bands + normalized earnings + reverse DCF.
+
+    The three valuation lenses (discount-to-own-history, peer-relative, and
+    reverse-DCF implied growth) are reported separately per CLAUDE.md, with the
+    downside / margin-of-safety surfaced alongside. Writes comps_<TICKER>.xlsx
+    and comps_<TICKER>.md.
+    """
+    peer_list = [p.strip().upper() for p in peers.split(",") if p.strip()] if peers else None
+    res = run_comps(
+        ticker, peer_list, wacc=wacc, terminal_growth=terminal_growth,
+        forecast_years=years, share_basis=share_basis, output_path=output,
+        fetch_prices=not no_prices, refresh=refresh,
+    )
+    s = res.subject
+    typer.secho(f"Comps for {s.ticker} → {res.xlsx_path}", fg=typer.colors.GREEN)
+    typer.echo(f"  markdown tear-sheet → {res.md_path}")
+    if s.error:
+        typer.secho(f"  WARNING: {s.error}", fg=typer.colors.YELLOW)
+    for name, b in (s.history.bands.items() if (s.history and s.history.bands) else []):
+        cur = f"{b.current:.2f}" if b.current == b.current else "n/a"
+        pct = f"{b.percentile_cheap:.0f}" if b.percentile_cheap == b.percentile_cheap else "n/a"
+        typer.echo(f"  {name:<10} current={cur}  cheap-vs-own-history %ile={pct}  (N={b.n})")
+    g, mos = s.base_implied_growth(), s.base_margin_of_safety()
+    if g == g:
+        typer.echo(f"  reverse DCF (base): implied FCFF growth {g * 100:.1f}%"
+                   + (f"  |  margin of safety {mos * 100:.1f}%" if mos == mos else ""))
+    elif s.is_bank:
+        typer.echo("  reverse DCF: N/A (bank)")
 
 
 @app.command("config-check")
