@@ -226,11 +226,13 @@ def _parse_company_facts(
        wins (handles restatements; preserves every period).
 
     2. Multiple US-GAAP synonyms per concept. Different filers use different
-       tags, and ONE filer may switch tags across years (CW moved Revenues
-       to a RevenueFromContractWithCustomer tag in 2018 for ASC 606). We
-       pick whichever candidate has the most unique ANNUAL period-end dates,
-       not the most raw entries — otherwise a pre-2018 tag with quarterly
-       interim entries beats a clean post-2018 tag with only FY entries.
+       tags, and ONE filer may switch tags across years (CW moved revenue
+       from SalesRevenueNet/Revenues to RevenueFromContractWithCustomer at
+       ASC 606 in 2018). We pick the candidate that covers the most recent
+       fiscal year, breaking ties by unique ANNUAL period-end count. The
+       longest run of annual periods sits on the DEPRECATED tag, so ranking
+       by count alone locks onto stale data that ends at the transition year
+       (CW's SalesRevenueNet stops at 2017). See _pick_richest_synonym.
 
     3. Some filers mis-tag standalone quarterly values with fp=FY. We capture
        `start` from each entry and store `period_days = end - start` so the
@@ -286,28 +288,45 @@ def _pick_richest_synonym(
     facts: dict[str, Any],
     candidates: list[str],
 ) -> tuple[str | None, dict[str, list[dict[str, Any]]]]:
-    """Return (chosen_tag, units_dict) for whichever candidate has the most
-    unique ANNUAL (or instant) period-end dates.
+    """Return (chosen_tag, units_dict) for whichever candidate best represents
+    the concept's CURRENT reporting basis.
 
-    Counting annual periods specifically — not raw entries — avoids the
-    pathological case where a legacy tag with many quarterly interim
-    entries outranks a current tag with clean annual coverage.
+    Ranking key per candidate: (latest annual period-end, count of unique
+    annual period-ends). Recency dominates; annual count is only the tie-break.
+
+    Why recency first: when a filer migrates tags across an accounting-standard
+    change (e.g. ASC 605 `SalesRevenueNet` -> ASC 606
+    `RevenueFromContractWithCustomer...`), the LONGEST run of annual periods
+    sits on the DEPRECATED tag. Ranking by raw annual count therefore locks
+    onto stale data that ends at the transition year — CW's `SalesRevenueNet`
+    has 10 annual ends (2008-2017) and beat its current tag's 5 (2021-2025);
+    CACI's legacy `Revenues` (2009-2018) beat its current tag by one. Preferring
+    the tag that covers the most recent fiscal year keeps the canonical series
+    on the live basis and keeps ONE consistent basis per series (no
+    cross-standard splicing). Counting annual periods — not raw entries — for
+    the tie-break means a tag cluttered with mis-tagged quarterly entries still
+    can't outrank a clean annual tag of equal recency.
     """
     best_tag: str | None = None
     best_units: dict[str, list[dict[str, Any]]] = {}
-    best_periods = -1
+    best_key: tuple[str, int] | None = None
     for tag in candidates:
         if tag not in facts:
             continue
         units = facts[tag].get("units", {}) or {}
-        unique_annual_ends: set[Any] = set()
+        unique_annual_ends: set[str] = set()
         for entries in units.values():
             for e in entries:
                 end = e.get("end")
                 if end and _is_annual_or_instant(e.get("start"), end):
                     unique_annual_ends.add(end)
-        if len(unique_annual_ends) > best_periods:
-            best_periods = len(unique_annual_ends)
+        # ISO date strings sort chronologically; "" sorts below any real date
+        # so a candidate with only quarterly entries can't win over an annual
+        # one but is still kept as a last resort if nothing else is present.
+        latest_end = max(unique_annual_ends) if unique_annual_ends else ""
+        key = (latest_end, len(unique_annual_ends))
+        if best_key is None or key > best_key:
+            best_key = key
             best_tag = tag
             best_units = units
     return best_tag, best_units
