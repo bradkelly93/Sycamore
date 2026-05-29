@@ -265,6 +265,16 @@ def run_screener(
                 mcap = yfin.get_market_cap(ticker)
             except Exception:  # noqa: BLE001 — yfinance is intentionally flaky
                 mcap = None
+            # Fallback: price × EDGAR shares. Keeps share count primary-source
+            # per CLAUDE.md and survives yfinance market-cap outages.
+            if mcap is None:
+                try:
+                    price = yfin.get_current_price(ticker)
+                    shares = _last(_series(ff, "SharesOutstanding"))
+                    if price and shares:
+                        mcap = float(price) * float(shares)
+                except Exception:  # noqa: BLE001
+                    mcap = None
         rows.append(_compute_raw_row(ticker, name, sec, ff, mcap))
 
     raw = pd.DataFrame([r.__dict__ for r in rows]).set_index("ticker")

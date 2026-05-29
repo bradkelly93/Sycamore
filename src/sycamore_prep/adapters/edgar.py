@@ -195,33 +195,34 @@ def _parse_company_facts(
 ) -> pd.DataFrame:
     """Flatten SEC companyfacts JSON into the canonical tidy schema.
 
-    Strategy: for each canonical concept, scan its candidate US-GAAP tags in
-    order and take the first one that has data. Within a tag, prefer the most
-    recently-reported value for any given (fy, fp, form) tuple — SEC sometimes
-    publishes restatements.
+    Two SEC quirks to handle:
+
+    1. The `fy` field in companyfacts is the fiscal year of the FILING, not
+       of the period being reported. A 10-K filed for FY2024 publishes three
+       years of comparatives — end=[2022,2023,2024] — all tagged fy=2024.
+       So the correct dedupe key is `(end, fp, form)`: per period-end, keep
+       the latest-filed value (handles restatements; preserves every period).
+
+    2. For each canonical concept we try multiple US-GAAP synonyms. Different
+       filers tag the same line item differently, and some filers ALSO switch
+       tags across years. We pick the synonym with the most unique period-end
+       dates after dedupe — "richest" wins, not "first in list" — so we don't
+       latch onto a single legacy entry just because its tag sorts earlier.
     """
     facts = facts_json.get("facts", {}).get("us-gaap", {})
     rows: list[dict[str, Any]] = []
 
     for canonical, candidates in concept_map.items():
-        chosen = None
-        for tag in candidates:
-            if tag in facts:
-                chosen = tag
-                break
+        chosen, chosen_unit_entries = _pick_richest_synonym(facts, candidates)
         if chosen is None:
             continue
-        units = facts[chosen].get("units", {})
-        # Pick the first unit (typically "USD" or "USD/shares" or "shares").
-        if not units:
-            continue
-        for unit_name, entries in units.items():
-            # Dedupe on (fy, fp, form) keeping the most recent `filed` date.
+        for unit_name, entries in chosen_unit_entries.items():
+            # Dedupe on (end, fp, form) keeping the most recent `filed` date.
             by_key: dict[tuple[Any, Any, Any], dict[str, Any]] = {}
             for e in entries:
-                key = (e.get("fy"), e.get("fp"), e.get("form"))
+                key = (e.get("end"), e.get("fp"), e.get("form"))
                 prev = by_key.get(key)
-                if prev is None or str(e.get("filed", "")) > str(prev.get("filed", "")):
+                if prev is None or str(e.get("filed", "")) >= str(prev.get("filed", "")):
                     by_key[key] = e
             for e in by_key.values():
                 rows.append({
@@ -245,3 +246,27 @@ def _parse_company_facts(
     df = pd.DataFrame(rows)
     df["period"] = pd.to_datetime(df["period"], errors="coerce").dt.strftime("%Y-%m-%d")
     return df.sort_values(["concept", "period"]).reset_index(drop=True)
+
+
+def _pick_richest_synonym(
+    facts: dict[str, Any],
+    candidates: list[str],
+) -> tuple[str | None, dict[str, list[dict[str, Any]]]]:
+    """Return (chosen_tag, units_dict) for whichever candidate has the most
+    unique period-end dates across all units. Empty dict if none match."""
+    best_tag: str | None = None
+    best_units: dict[str, list[dict[str, Any]]] = {}
+    best_periods = -1
+    for tag in candidates:
+        if tag not in facts:
+            continue
+        units = facts[tag].get("units", {}) or {}
+        unique_periods: set[Any] = set()
+        for entries in units.values():
+            for e in entries:
+                unique_periods.add(e.get("end"))
+        if len(unique_periods) > best_periods:
+            best_periods = len(unique_periods)
+            best_tag = tag
+            best_units = units
+    return best_tag, best_units
