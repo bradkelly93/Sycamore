@@ -9,6 +9,7 @@ import typer
 from .adapters import EdgarProvider
 from .comps import run_comps
 from .config import cache_dir, load_config
+from .models import build_models
 from .screener import run_screener
 from .spinoffs.tracker import load_tracker, run_scan, run_track
 from .universe.builder import build_universe, load_universe
@@ -189,6 +190,60 @@ def comps_cmd(
                    + (f"  |  margin of safety {mos * 100:.1f}%" if mos == mos else ""))
     elif s.is_bank:
         typer.echo("  reverse DCF: N/A (bank)")
+
+
+@app.command("build-models")
+def build_models_cmd(
+    ticker: str = typer.Argument(..., help="Subject ticker (e.g., CW)."),
+    peers: str = typer.Option(
+        None, "--peers", help="Comma-separated peers; default from config.yaml peers map."
+    ),
+    wacc: float = typer.Option(None, "--wacc", help="Override WACC (default config valuation.wacc)."),
+    terminal_growth: float = typer.Option(
+        None, "--terminal-growth", help="Override perpetuity growth (default config)."
+    ),
+    years: int = typer.Option(None, "--years", help="Forecast horizon (default config forecast_years)."),
+    bank: bool = typer.Option(
+        None, "--bank/--no-bank", help="Override bank auto-detection (default: auto via Deposits tag)."
+    ),
+    spinco: str = typer.Option(
+        None, "--spinco", help="SpinCo ticker/CIK → adds the SOTP tab via the spin-off tracker."
+    ),
+    share_basis: str = typer.Option(
+        "wad", "--share-basis", help="Historical share basis: wad | shares_out | eps_implied."
+    ),
+    output: Path = typer.Option(
+        None, "--output", "-o", help="Custom xlsx path (default models/<TICKER>_model.xlsx)."
+    ),
+    refresh: bool = typer.Option(False, "--refresh", help="Bypass caches; re-pull fundamentals + prices."),
+) -> None:
+    """Build the Excel model scaffold for a ticker → models/<TICKER>_model.xlsx.
+
+    A LEAN, rebuildable skeleton: drivers + LIVE Excel formulas seeded from the
+    comps / spin-off engines so the reverse-DCF ties to `comps <TICKER>` and the
+    bear page flexes in Excel. NOT a finished model — see models/MODEL_NOTES.md.
+    Open in Excel to confirm formulas compute (openpyxl does not evaluate them).
+    """
+    peer_list = [p.strip().upper() for p in peers.split(",") if p.strip()] if peers else None
+    res = build_models(
+        ticker, peer_list, wacc=wacc, terminal_growth=terminal_growth,
+        forecast_years=years, share_basis=share_basis, bank=bank, spinco=spinco,
+        output_path=output, refresh=refresh,
+    )
+    typer.secho(f"Model scaffold for {res.ticker} → {res.xlsx_path}", fg=typer.colors.GREEN)
+    typer.echo(f"  variant: {'bank (P/TBV + normalized EPS)' if res.is_bank else 'non-bank (FCFF DCF)'}"
+               + ("  ·  SOTP tab included" if res.has_sotp else ""))
+    s = res.comps_result.subject
+    if s.error:
+        typer.secho(f"  WARNING: {s.error}", fg=typer.colors.YELLOW)
+    g, mos = s.base_implied_growth(), s.base_margin_of_safety()
+    if g == g:
+        typer.echo(f"  reverse DCF (base): implied FCFF growth {g * 100:.1f}%"
+                   + (f"  |  margin of safety {mos * 100:.1f}%" if mos == mos else ""))
+    elif res.is_bank:
+        typer.echo("  reverse DCF: N/A (bank) — P/TBV + normalized EPS instead")
+    typer.echo("  Open in Excel: confirm no #REF!/#DIV0!, the reverse-DCF residual ≈ 0, "
+               "and the bear column flexes. Re-solve implied growth with Goal Seek.")
 
 
 spin_app = typer.Typer(

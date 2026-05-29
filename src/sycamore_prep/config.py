@@ -79,3 +79,12 @@ def raw_dir() -> Path:
     p = project_root() / load_config().raw.dir
     p.mkdir(parents=True, exist_ok=True)
     return p
+
+
+def models_dir() -> Path:
+    """Where generated model scaffolds (<TICKER>_model.xlsx) are written. The
+    committed contents are MODEL_NOTES.md + templates/; *.xlsx here is
+    gitignored (real pulled data)."""
+    p = project_root() / "models"
+    p.mkdir(parents=True, exist_ok=True)
+    return p
