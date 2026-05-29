@@ -78,6 +78,30 @@ INDUSTRIAL_ROWS = [
 ]
 
 
+def test_series_filter_excludes_multi_year_cumulative_entries():
+    """3-year cumulative revenue rows from a 10-K comparative table have
+    period_days ~1095. Without an upper bound, _last() picks them and any
+    ratio mixing them with annual flows breaks. (CW: fcf_margin came back
+    5.8% because Revenue was a 3-year cumulative ~$9.4B vs the real
+    ~$3.3B annual.)"""
+    from sycamore_prep.metrics.profitability import _series
+
+    rows = [
+        {"concept": "Revenues", "period": "2023-12-31", "value": 3000.0,
+         "fy": 2023, "period_start": "2023-01-01", "period_days": 365},
+        {"concept": "Revenues", "period": "2024-12-31", "value": 3300.0,
+         "fy": 2024, "period_start": "2024-01-01", "period_days": 366},
+        # 3-year cumulative for FY2024 — must be rejected.
+        {"concept": "Revenues", "period": "2024-12-31", "value": 9400.0,
+         "fy": 2024, "period_start": "2022-01-01", "period_days": 1095},
+    ]
+    ff = _ff(rows)
+    rev = _series(ff, "Revenues")
+    # Only the annual values survive; the cumulative is filtered out.
+    assert list(rev.index) == ["2023-12-31", "2024-12-31"]
+    assert list(rev.values) == [3000.0, 3300.0]
+
+
 def test_series_filter_excludes_quarterly_entries_tagged_FY():
     """When `period_days` is present, FY queries must reject sub-annual spans.
     Reproduces the CW gross-margin >100% bug: standalone quarterly values

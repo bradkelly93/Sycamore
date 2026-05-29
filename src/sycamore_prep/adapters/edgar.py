@@ -200,10 +200,15 @@ def _period_days(start: Any, end: Any) -> int | None:
 
 def _is_annual_or_instant(start: Any, end: Any) -> bool:
     """True if this entry represents a full fiscal year (~12 months) or is
-    an instant balance-sheet snapshot (no start). The 350-day floor catches
-    52-week fiscal years (364 days) while rejecting quarters (~91)."""
+    an instant balance-sheet snapshot (no start). The window catches 52-week
+    (364d) and 53-week (371d) fiscal years while rejecting both quarterly
+    interim entries (~91d) AND multi-year cumulative entries that some
+    filers publish in 10-K comparative tables (~730-1100d). Without an
+    upper bound, a 3-year cumulative revenue row pollutes the latest-FY
+    pick and silently breaks any ratio mixing it with annual flows.
+    """
     d = _period_days(start, end)
-    return d is None or d >= 350
+    return d is None or 350 <= d <= 400
 
 
 def _parse_company_facts(
@@ -240,10 +245,14 @@ def _parse_company_facts(
         if chosen is None:
             continue
         for unit_name, entries in chosen_unit_entries.items():
-            # Dedupe on (end, fp, form) keeping the most recent `filed` date.
-            by_key: dict[tuple[Any, Any, Any], dict[str, Any]] = {}
+            # Dedupe on (end, fp, form, start) keeping the most recent
+            # `filed` date. `start` is in the key so a 365-day entry and a
+            # multi-year cumulative entry for the same period_end don't
+            # collapse to one arbitrary survivor — the access-time duration
+            # filter in metrics._series picks the annual one.
+            by_key: dict[tuple[Any, Any, Any, Any], dict[str, Any]] = {}
             for e in entries:
-                key = (e.get("end"), e.get("fp"), e.get("form"))
+                key = (e.get("end"), e.get("fp"), e.get("form"), e.get("start"))
                 prev = by_key.get(key)
                 if prev is None or str(e.get("filed", "")) >= str(prev.get("filed", "")):
                     by_key[key] = e

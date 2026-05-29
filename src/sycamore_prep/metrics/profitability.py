@@ -16,14 +16,16 @@ def _series(ff: FinancialsFrame, concept: str, fp: str = "FY") -> pd.Series:
     sub = ff.concept(concept, fp=fp)
     if sub.empty:
         return pd.Series(dtype=float, name=concept)
-    # Some filers mis-tag standalone quarterly values with fp=FY. When
-    # period_days is available (instant concepts have it as null, flow
-    # concepts as the calendar span), keep only annual flows (>=350 days)
-    # or instants. This filter is only applied to fp=FY queries — quarterly
-    # queries still see all matching rows.
+    # Filter fp=FY queries to genuinely annual entries — period_days in
+    # [350, 400] catches 52- and 53-week fiscal years while rejecting both
+    # quarterly interim values mis-tagged FY (~91d) and multi-year
+    # cumulative entries that some filers publish in 10-K comparative
+    # tables (~730-1100d). Instant balance-sheet snapshots have null days
+    # and are kept. Quarterly fp queries (fp="Q1" etc.) see all matching
+    # rows unchanged.
     if fp == "FY" and "period_days" in sub.columns:
         days = pd.to_numeric(sub["period_days"], errors="coerce")
-        sub = sub[days.isna() | (days >= 350)]
+        sub = sub[days.isna() | ((days >= 350) & (days <= 400))]
         if sub.empty:
             return pd.Series(dtype=float, name=concept)
     s = pd.Series(sub["value"].astype(float).values, index=sub["period"].values, name=concept)
