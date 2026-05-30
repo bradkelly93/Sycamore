@@ -1,0 +1,15 @@
+{
+  "id": "0x9a1b",
+  "slug": "spirit-airlines-bankruptcy-2026",
+  "question": "Will Spirit Airlines file for bankruptcy in 2026?",
+  "description": "Resolves YES if Spirit Airlines (SAVE) files for Chapter 11 protection at any point in 2026.",
+  "outcomes": "[\"Yes\", \"No\"]",
+  "outcomePrices": "[\"0.32\", \"0.68\"]",
+  "volumeNum": 1875000.0,
+  "liquidityNum": 42000.0,
+  "endDate": "2026-12-31T00:00:00Z",
+  "category": "Business",
+  "active": true,
+  "closed": false,
+  "clobTokenIds": "[\"111111\", \"222222\"]"
+}

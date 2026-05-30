@@ -90,6 +90,55 @@ pulled fundamentals before this was added, re-pull with
 EV/EBITDA and net-debt/EBITDA fall back to an EBIT-only proxy that
 over-states leverage for D&A-heavy businesses (midstream, industrials).
 
+### Phase 6 — Prediction-market overlay (Polymarket)
+
+A **non-primary, read-only** signal lens layered on the bottom-up tools. It
+reads how Polymarket is positioned across four apertures around a name —
+**company**, **peer** (reuses the `peers` map), **industry** (sector keywords),
+and **macro** — to surface opportunity or risk the fundamental tools can't see.
+Per `CLAUDE.md` it is walled off from the screener composite and every row is
+tagged `source="polymarket (non-primary)"`. No trading — read-only market data.
+
+**1. Discover candidate markets.** Auto-matches markets to your names with a
+transparent `relevance_score` and upserts them into an editable mapping CSV:
+
+```bash
+sycamore-prep prediction-discover CW WES UMBF
+sycamore-prep prediction-discover --universe --limit 50
+sycamore-prep prediction-discover SAVE --apertures company,peer
+```
+
+Then open `data/raw/prediction_markets.csv`, set `confirmed=True` on the rows
+that genuinely attach to a name, and fix `event_type` / `direction` if the
+keyword guess is off. Re-running discovery refreshes the machine fields
+(`relevance_score`, `question`) but **never overwrites your edits**.
+
+**2. Build the overlay.** Pulls current implied probabilities; downside
+read-throughs sort to the top (downside-first):
+
+```bash
+sycamore-prep prediction-overlay CW WES
+sycamore-prep prediction-overlay --downside-only        # only RISK read-throughs
+sycamore-prep prediction-overlay --include-macro        # add the macro aperture (segregated)
+sycamore-prep prediction-overlay --include-unconfirmed  # use candidates before confirming
+```
+
+Output (`data/cache/prediction_overlay.xlsx` + `.csv`) carries, per market: the
+implied probability, its 30-day move (`prob_chg_30d` — the positioning signal),
+liquidity/volume, resolution date, the `read_through` (RISK / OPPORTUNITY /
+WATCH), `relevance_score`, and the `source` tag.
+
+**3. Annotate the screener (optional).** Adds `event_*` columns — never touches
+`composite_rank`:
+
+```bash
+sycamore-prep screen CW WES UMBF --with-prediction-overlay
+```
+
+`event_contradiction=True` flags an otherwise high-ranked, clean name that
+nonetheless carries a material market-implied RISK — exactly the divergence the
+bottom-up screen can't see.
+
 ## Notes on the remote execution sandbox
 
 The Claude Code on the web container's egress policy blocks
@@ -97,6 +146,11 @@ The Claude Code on the web container's egress policy blocks
 `pull-fundamentals` must be run on a host where SEC endpoints are reachable
 (your laptop, or with a network policy that allows SEC). The universe
 builder, tests, and Excel scaffolds work offline.
+
+The same applies to Polymarket (`gamma-api.polymarket.com`): the overlay is
+fully wired and offline-tested against fixtures, but `prediction-discover` and
+`prediction-overlay` must run where Polymarket is reachable. The mapping CSV,
+the relevance scorer, and the overlay assembly all work offline.
 
 ## Non-goals
 

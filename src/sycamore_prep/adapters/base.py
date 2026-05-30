@@ -106,3 +106,56 @@ class PriceProvider(ABC):
 
     @abstractmethod
     def get_shares(self, ticker: str) -> float | None: ...
+
+
+# Canonical schema for the raw markets frame every EventProbabilityProvider
+# returns. Prediction-market odds are NON-PRIMARY (crowd opinion, not filings),
+# so every row carries a `source` tag and is never spliced into a fundamentals
+# frame. The discovery/overlay layer (prediction_markets/) enriches these rows
+# with ticker, aperture, relevance_score, and read_through — providers stay
+# ignorant of portfolio context so a Kalshi/Metaculus provider drops in here
+# unchanged (Swappable-data-layer principle).
+MARKET_COLUMNS = [
+    "slug",            # stable market identifier / URL slug
+    "question",        # full market question text
+    "outcome",         # the outcome this row prices (e.g., "Yes")
+    "implied_prob",    # 0–1 implied probability for `outcome` (price ≈ prob)
+    "volume",          # cumulative traded volume in USD (depth / credibility)
+    "liquidity",       # current order-book liquidity in USD, if provided
+    "resolution_date", # market end / resolution date (YYYY-MM-DD) or None
+    "category",        # provider category/tag string, if any (discovery hint)
+    "url",             # canonical market URL
+    "as_of",           # snapshot timestamp (UTC ISO-8601) — prices move
+    "source",          # provider tag, e.g., "polymarket (non-primary)"
+]
+
+
+class EventProbabilityProvider(ABC):
+    """Prediction-market implied probabilities (Polymarket, Kalshi, …).
+
+    NON-PRIMARY by construction: these are crowd odds, not filings. Every
+    returned row carries a `source` tag so downstream code can never confuse an
+    implied probability with a primary-source fundamental. READ-ONLY — this
+    interface exposes no trading or order-placement methods by design (live
+    trading is an explicit CLAUDE.md non-goal).
+    """
+
+    name: str = "base"
+
+    @abstractmethod
+    def search_markets(
+        self,
+        query: str,
+        *,
+        active_only: bool = True,
+        limit: int = 50,
+    ) -> pd.DataFrame:
+        """Keyword-search markets. Returns a tidy frame with MARKET_COLUMNS
+        (one row per outcome). Used by the discovery layer to propose
+        ticker→market matches with a relevance score."""
+
+    @abstractmethod
+    def get_market(self, slug: str) -> pd.DataFrame:
+        """Current snapshot for a single market slug — one row per outcome,
+        MARKET_COLUMNS schema. Used by the overlay to refresh implied
+        probabilities for confirmed mappings."""

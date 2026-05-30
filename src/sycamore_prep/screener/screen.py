@@ -229,6 +229,7 @@ def run_screener(
     output_path: Path | str | None = None,
     skip_market_cap: bool = False,
     hard_exclude_neg_space: bool = False,
+    with_prediction_overlay: bool = False,
 ) -> pd.DataFrame:
     """Run the three-attribute screen and write screener_output.xlsx.
 
@@ -312,6 +313,12 @@ def run_screener(
         out["composite_rank"] = range(1, len(out) + 1)
         out.loc[out["composite_score"].isna(), "composite_rank"] = np.nan
 
+    # Optional NON-PRIMARY prediction-market annotations. Joined as separate
+    # event_* columns — never merged into composite_score/rank (CLAUDE.md:
+    # the prediction lens is walled off from every scoring path).
+    if with_prediction_overlay:
+        out = _attach_prediction_overlay(out)
+
     # Reorder columns: identity, sub-scores prominent, then components, then sources.
     front = [
         "name", "gics_sector", "is_bank", "market_cap",
@@ -361,3 +368,40 @@ def _write_screener_xlsx(df: pd.DataFrame, path: Path) -> None:
 
     path.parent.mkdir(parents=True, exist_ok=True)
     wb.save(path)
+
+
+def _attach_prediction_overlay(out: pd.DataFrame) -> pd.DataFrame:
+    """Join NON-PRIMARY prediction-market annotations (event_* columns) onto the
+    screener output.
+
+    Best-effort and isolated: it never raises into the screen (Polymarket egress
+    is often blocked), and it NEVER feeds composite_score/rank — a separate lens
+    per CLAUDE.md. `event_contradiction` flags an otherwise high-ranked, clean
+    name that nonetheless carries a material market-implied RISK — exactly the
+    signal the bottom-up screen can't see.
+    """
+    try:
+        from ..adapters import PolymarketProvider
+        from ..prediction_markets.overlay import build_overlay, screener_annotations
+
+        overlay = build_overlay(
+            PolymarketProvider(), tickers=list(out.index), confirmed_only=True
+        )
+        ann = screener_annotations(overlay)
+        out = out.join(ann, how="left")
+
+        cp = load_config().prediction.contradiction_prob
+        n = len(out)
+        prob = pd.to_numeric(out.get("event_top_prob"), errors="coerce")
+        rank = pd.to_numeric(out.get("composite_rank"), errors="coerce")
+        neg = out.get("negative_space")
+        neg = pd.Series(False, index=out.index) if neg is None else neg.fillna(False).astype(bool)
+        out["event_contradiction"] = (
+            (prob.fillna(0.0) >= cp)
+            & (out.get("event_read_through") == "RISK")
+            & (~neg)
+            & (rank.fillna(n) <= (n / 2.0))
+        )
+    except Exception as exc:  # noqa: BLE001 — overlay must never break the screen
+        out["event_overlay_error"] = str(exc)
+    return out

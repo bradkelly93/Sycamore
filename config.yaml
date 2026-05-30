@@ -35,3 +35,34 @@ peers:
 
 # Test tickers used in Phase 1 acceptance.
 test_tickers: ["CW", "WES", "UMBF", "LECO", "MTDR"]
+
+# Prediction-market overlay (Polymarket). NON-PRIMARY signal layer — see
+# CLAUDE.md. Read-only (no trading); never feeds the screener composite.
+polymarket:
+  gamma_base_url: "https://gamma-api.polymarket.com"
+  clob_base_url: "https://clob.polymarket.com"
+  rate_limit_rps: 5
+  user_agent: "sycamore-prep/0.1 bradley.kelly93@gmail.com"
+  # Minimum relevance (0–1) for `prediction-discover` to auto-include a match.
+  min_relevance: 0.45
+
+prediction:
+  mapping_csv: "prediction_markets.csv"
+  contradiction_prob: 0.20
+  # Industry aperture: GICS sector → keyword searches on Polymarket.
+  sector_keywords:
+    Energy: ["oil price", "WTI crude", "OPEC production", "natural gas price"]
+    Financials: ["bank failure", "Fed rate cut", "US recession"]
+    Industrials: ["US recession", "government shutdown", "tariffs"]
+    "Health Care": ["FDA approval", "Medicare", "drug pricing"]
+    Materials: ["copper price", "gold price", "China GDP"]
+    "Information Technology": ["AI regulation", "chip export ban"]
+    "Consumer Discretionary": ["US recession", "consumer spending"]
+  # Macro aperture: broad markets + the sectors they read through to.
+  macro_markets:
+    - query: "Fed rate cut 2026"
+      applies_to: ["Financials", "Real Estate", "Utilities", "Consumer Discretionary"]
+    - query: "US recession 2026"
+      applies_to: ["*"]
+    - query: "WTI crude oil price 2026"
+      applies_to: ["Energy", "Materials"]

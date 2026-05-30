@@ -34,11 +34,40 @@ class ValuationConfig(BaseModel):
     forecast_years: int = 10
 
 
+class PolymarketConfig(BaseModel):
+    gamma_base_url: str = "https://gamma-api.polymarket.com"
+    clob_base_url: str = "https://clob.polymarket.com"
+    rate_limit_rps: float = 5.0
+    user_agent: str = "sycamore-prep/0.1"
+    # Discovery: minimum relevance (0–1) to auto-include a candidate match.
+    min_relevance: float = 0.45
+
+
+class MacroMarketSpec(BaseModel):
+    query: str
+    # GICS sectors this macro market bears on; ["*"] = applies to every name.
+    applies_to: list[str] = Field(default_factory=lambda: ["*"])
+
+
+class PredictionConfig(BaseModel):
+    # Editable ticker→market mapping, under data/raw/.
+    mapping_csv: str = "prediction_markets.csv"
+    # Industry aperture: GICS sector → keyword searches.
+    sector_keywords: dict[str, list[str]] = Field(default_factory=dict)
+    # Macro aperture: broad markets + the sectors they read through to.
+    macro_markets: list[MacroMarketSpec] = Field(default_factory=list)
+    # A confirmed RISK market at/above this implied prob, on an otherwise
+    # high-ranked name, is surfaced as a screener contradiction flag.
+    contradiction_prob: float = 0.20
+
+
 class AppConfig(BaseModel):
     edgar: EdgarConfig
     cache: CacheConfig = Field(default_factory=CacheConfig)
     raw: RawConfig = Field(default_factory=RawConfig)
     valuation: ValuationConfig = Field(default_factory=ValuationConfig)
+    polymarket: PolymarketConfig = Field(default_factory=PolymarketConfig)
+    prediction: PredictionConfig = Field(default_factory=PredictionConfig)
     peers: dict[str, list[str]] = Field(default_factory=dict)
     test_tickers: list[str] = Field(default_factory=list)
 
@@ -66,3 +95,8 @@ def raw_dir() -> Path:
     p = project_root() / load_config().raw.dir
     p.mkdir(parents=True, exist_ok=True)
     return p
+
+
+def mapping_csv_path() -> Path:
+    """Editable ticker→prediction-market mapping CSV (data/raw/)."""
+    return raw_dir() / load_config().prediction.mapping_csv
