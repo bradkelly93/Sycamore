@@ -165,6 +165,12 @@ def vol_cmd(
     horizon: int = typer.Option(
         None, "--horizon-days", help="Expected-move horizon in calendar days (default from config)."
     ),
+    skew: bool = typer.Option(
+        False, "--skew",
+        help="Also fetch 25-delta put skew via the dxLink Greeks stream "
+             "(slower; one websocket per ticker; needs the optional "
+             "'websockets' dependency).",
+    ),
     refresh: bool = typer.Option(False, "--refresh", help="Bypass today's cache and re-pull."),
 ) -> None:
     """Per-ticker volatility overlay (downside cross-check) from tastytrade.
@@ -186,10 +192,9 @@ def vol_cmd(
         raise typer.Exit(code=1)
 
     horizon_days = horizon or load_config().tastytrade.horizon_days
+    provider = TastytradeProvider()
     try:
-        vf = TastytradeProvider().get_volatility(
-            [t.upper() for t in tickers], use_cache=not refresh
-        )
+        vf = provider.get_volatility([t.upper() for t in tickers], use_cache=not refresh)
     except Exception as exc:  # noqa: BLE001
         typer.secho(f"tastytrade fetch failed: {exc}", fg=typer.colors.RED)
         raise typer.Exit(code=1)
@@ -206,11 +211,24 @@ def vol_cmd(
         )
         raise typer.Exit(code=1)
     df["vol_flags"] = df["vol_flags"].apply(lambda v: ", ".join(v) if isinstance(v, list) else "")
+
+    if skew:
+        skews: dict[str, float | None] = {}
+        for t in tickers:
+            try:
+                res = provider.put_skew(t, target_days=horizon_days)
+                skews[t.upper()] = round(res["put_skew_25d"], 4) if res else None
+            except Exception as exc:  # noqa: BLE001 — streaming is best-effort
+                typer.secho(f"  skew[{t}] unavailable: {exc}", fg=typer.colors.YELLOW)
+                skews[t.upper()] = None
+        df["put_skew_25d"] = df["ticker"].map(skews)
+
     show = [c for c in [
         "ticker", "iv_rank", "iv_percentile", "iv_index", "iv_hv_30_day_diff",
         "expected_move_30d_pct", "expected_move_earnings_pct",
         "days_to_earnings", "next_earnings_date",
-        "sigma_down_30d_price", "vol_beta", "liquidity_rating", "vol_flags",
+        "sigma_down_30d_price", "put_skew_25d",
+        "vol_beta", "liquidity_rating", "vol_flags",
     ] if c in df.columns]
     typer.echo(df[show].to_string(index=False))
     typer.secho("source: tastytrade — downside cross-check only", fg=typer.colors.GREEN)

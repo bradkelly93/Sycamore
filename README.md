@@ -116,6 +116,7 @@ Per-ticker overlay, and the screener annotated with vol columns:
 ```bash
 sycamore-prep vol CW
 sycamore-prep vol CW --price 310 --mos-floor 280   # adds $ downside + MoS breach check
+sycamore-prep vol CW --skew                        # also streams 25-delta put skew (see below)
 sycamore-prep screen CW WES UMBF LECO MTDR --vol   # score/rank unchanged
 ```
 
@@ -131,6 +132,11 @@ What it surfaces (every row `source = tastytrade`, cached daily to
 - **Margin-of-safety cross-check** — with `--price` and `--mos-floor`, flags
   when the option-implied 1-sigma-down price punctures your floor (in Phase 3
   that floor is the reverse-DCF downside).
+- **Put skew (25-delta)** — with `--skew`, the put IV minus call IV at the
+  25-delta wings, streamed per-strike from tastytrade's dxLink Greeks feed.
+  Positive = the market is paying up for downside protection. This is the one
+  piece that needs the websocket stream, so it's opt-in and requires the extra:
+  `pip install 'sycamore-prep[vol]'`.
 
 If credentials or network are unavailable the overlay **skips gracefully** —
 the screener still produces all fundamental output, with a one-line note. Field

@@ -42,6 +42,7 @@ import pandas as pd
 
 from ..config import load_config
 from . import cache
+from . import tastytrade_stream as tt_stream
 from .base import VOLATILITY_COLUMNS, VolatilityFrame, VolatilityProvider
 
 
@@ -262,3 +263,46 @@ class TastytradeProvider(VolatilityProvider):
         raise TastytradeError(
             f"market-metrics fetch failed after {self._max_retries} retries"
         ) from last
+
+    # ---- options Greeks / put skew (dxLink streaming, opt-in) ----
+    def get_option_greeks(self, streamer_symbols, timeout: float = 20.0) -> dict:
+        """One-shot Greeks snapshot for the given dxLink streamer symbols."""
+        import asyncio
+
+        url, token = tt_stream.parse_quote_token(self._get("/api-quote-tokens"))
+        if not url or not token:
+            raise TastytradeError("tastytrade returned no dxlink url/token.")
+        return asyncio.run(tt_stream.stream_greeks(url, token, streamer_symbols, timeout=timeout))
+
+    def put_skew(
+        self,
+        symbol: str,
+        on_or_after=None,
+        target_days: float | None = None,
+        wing: float = 0.25,
+        asof=None,
+        timeout: float = 20.0,
+    ) -> dict | None:
+        """25-delta put skew for `symbol`'s chosen expiration (downside signal).
+
+        Pulls the nested option chain, picks an expiration (next-earnings or a
+        target horizon), streams Greeks for its strikes, and returns the skew.
+        """
+        chain = tt_stream.parse_nested_option_chain(
+            self._get(f"/option-chains/{symbol.upper()}/nested")
+        )
+        exp = tt_stream.select_chain_expiration(
+            chain, on_or_after=on_or_after, target_days=target_days, asof=asof
+        )
+        if not exp:
+            return None
+        symbols: list[str] = []
+        for o in exp["options"]:
+            if o.get("call_streamer_symbol"):
+                symbols.append(o["call_streamer_symbol"])
+            if o.get("put_streamer_symbol"):
+                symbols.append(o["put_streamer_symbol"])
+        if not symbols:
+            return None
+        greeks = self.get_option_greeks(symbols, timeout=timeout)
+        return tt_stream.skew_from_greeks(greeks, wing=wing, expiration_date=exp["expiration_date"])
