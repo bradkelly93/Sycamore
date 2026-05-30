@@ -231,8 +231,8 @@ def _enrich_rows_with_vol(rows: list[ScreenerRow]) -> str | None:
 
     if not TastytradeProvider.available():
         return (
-            "vol overlay skipped: set TASTYTRADE_USERNAME / TASTYTRADE_PASSWORD "
-            "to enable (data-only — no positions, no orders)."
+            "vol overlay skipped: set TASTYTRADE_CLIENT_SECRET / "
+            "TASTYTRADE_REFRESH_TOKEN to enable (data-only — no positions, no orders)."
         )
     tickers = [r.ticker for r in rows if r.error is None]
     if not tickers:

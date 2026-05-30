@@ -117,7 +117,8 @@ def screen_cmd(
     vol: bool = typer.Option(
         False, "--vol",
         help="Annotate with the tastytrade volatility overlay (downside "
-             "cross-check). Needs TASTYTRADE_USERNAME/PASSWORD; never scored.",
+             "cross-check). Needs TASTYTRADE_CLIENT_SECRET/REFRESH_TOKEN; "
+             "never scored.",
     ),
 ) -> None:
     """Run the three-attribute quality-value screener.
@@ -169,16 +170,17 @@ def vol_cmd(
     """Per-ticker volatility overlay (downside cross-check) from tastytrade.
 
     DATA ONLY — reads market-level IV metrics for the named tickers; never
-    positions, never orders. Set TASTYTRADE_USERNAME / TASTYTRADE_PASSWORD in
-    the environment (never config.yaml).
+    positions, never orders. Set TASTYTRADE_CLIENT_SECRET / TASTYTRADE_REFRESH_TOKEN
+    in the environment (OAuth2; never config.yaml).
     """
     from .adapters import TastytradeProvider
     from .metrics.volatility import volatility_overlay
 
     if not TastytradeProvider.available():
         typer.secho(
-            "Set TASTYTRADE_USERNAME and TASTYTRADE_PASSWORD in your environment "
-            "first (never config.yaml).",
+            "Set TASTYTRADE_CLIENT_SECRET and TASTYTRADE_REFRESH_TOKEN in your "
+            "environment first (OAuth2; never config.yaml). Create them under "
+            "'OAuth Applications' in your tastytrade account.",
             fg=typer.colors.RED,
         )
         raise typer.Exit(code=1)
@@ -205,7 +207,7 @@ def vol_cmd(
         raise typer.Exit(code=1)
     df["vol_flags"] = df["vol_flags"].apply(lambda v: ", ".join(v) if isinstance(v, list) else "")
     show = [c for c in [
-        "ticker", "iv_rank", "iv_percentile", "iv_index",
+        "ticker", "iv_rank", "iv_percentile", "iv_index", "iv_hv_30_day_diff",
         "expected_move_30d_pct", "expected_move_earnings_pct",
         "days_to_earnings", "next_earnings_date",
         "sigma_down_30d_price", "vol_beta", "liquidity_rating", "vol_flags",

@@ -100,12 +100,15 @@ authenticated gateway to market-level volatility metrics — it never reads
 positions, never places orders, and **never feeds the three-attribute score**.
 It only annotates.
 
-Credentials come from the environment, never `config.yaml` (which is
-committed):
+Auth is OAuth2 (tastytrade discontinued username/password session-tokens on
+2025-12-01). One-time setup in your tastytrade account: **OAuth Applications →
+create an app** (save the *client secret*), then **Manage → Create Grant**
+(save the *refresh token*; it never expires). Credentials live in the
+environment, never `config.yaml` (which is committed):
 
 ```bash
-export TASTYTRADE_USERNAME=you@example.com
-export TASTYTRADE_PASSWORD='...'
+export TASTYTRADE_CLIENT_SECRET=...
+export TASTYTRADE_REFRESH_TOKEN=...
 ```
 
 Per-ticker overlay, and the screener annotated with vol columns:
@@ -130,9 +133,9 @@ What it surfaces (every row `source = tastytrade`, cached daily to
   that floor is the reverse-DCF downside).
 
 If credentials or network are unavailable the overlay **skips gracefully** —
-the screener still produces all fundamental output, with a one-line note. The
-`market-metrics` field mapping should be verified on your first authenticated
-run (the developer portal blocks automated doc fetches).
+the screener still produces all fundamental output, with a one-line note. Field
+names are verified against the tastytrade SDK v12 schema, and parsing is
+defensive (an unknown field shows blank rather than crashing).
 
 ## Notes on the remote execution sandbox
 
@@ -140,9 +143,9 @@ The Claude Code on the web container's egress policy blocks
 `www.sec.gov` and `data.sec.gov`. The EDGAR adapter is fully wired up, but
 `pull-fundamentals` must be run on a host where SEC endpoints are reachable
 (your laptop, or with a network policy that allows SEC). The same applies to
-the tastytrade volatility overlay (`vol` / `screen --vol`): `api.tastytrade.com`
-must be reachable and `TASTYTRADE_USERNAME` / `TASTYTRADE_PASSWORD` set. The
-universe builder, tests, and Excel scaffolds work offline.
+the tastytrade volatility overlay (`vol` / `screen --vol`): `api.tastyworks.com`
+must be reachable and `TASTYTRADE_CLIENT_SECRET` / `TASTYTRADE_REFRESH_TOKEN`
+set. The universe builder, tests, and Excel scaffolds work offline.
 
 ## Non-goals
 

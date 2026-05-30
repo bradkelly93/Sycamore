@@ -276,6 +276,7 @@ def volatility_overlay(
     ivp = iv_percentile_pct(vf, ticker)
     b = beta(vf, ticker)
     liq = liquidity_rating(vf, ticker)
+    iv_hv = vf.latest("iv_hv_30_day_diff", ticker)
     edate = next_earnings_date(vf, ticker)
     dte_earn = days_to(edate, asof) if edate else None
 
@@ -307,6 +308,7 @@ def volatility_overlay(
         "iv_rank": ivr,
         "iv_percentile": ivp,
         "vol_beta": b,
+        "iv_hv_30_day_diff": iv_hv,
         "liquidity_rating": liq,
         "expected_move_30d_pct": em_30,
         "expected_move_earnings_pct": em_earn,

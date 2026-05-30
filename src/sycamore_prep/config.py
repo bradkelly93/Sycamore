@@ -38,11 +38,13 @@ class TastytradeConfig(BaseModel):
     """Non-secret settings for the volatility overlay.
 
     Credentials are NEVER stored here (config.yaml is committed) — set
-    TASTYTRADE_USERNAME / TASTYTRADE_PASSWORD in the environment instead.
+    TASTYTRADE_CLIENT_SECRET / TASTYTRADE_REFRESH_TOKEN in the environment
+    (OAuth2; username/password session-tokens were discontinued 2025-12-01).
     """
 
-    base_url: str = "https://api.tastytrade.com"
+    base_url: str = "https://api.tastyworks.com"
     user_agent: str = "sycamore-prep/0.1 (volatility-overlay)"
+    api_version: str = "20251101"
     horizon_days: int = 30
 
 

@@ -110,6 +110,10 @@ def test_parser_schema_source_and_values():
     assert vf.latest("iv_percentile", "CW") == pytest.approx(0.71)
     assert vf.latest("beta", "CW") == pytest.approx(1.05)
     assert vf.latest("liquidity_rating", "CW") == pytest.approx(3.0)
+    assert vf.latest("iv_30_day", "CW") == pytest.approx(0.27)
+    assert vf.latest("hv_30_day", "CW") == pytest.approx(0.22)
+    assert vf.latest("iv_hv_30_day_diff", "CW") == pytest.approx(0.05)
+    assert vf.latest("corr_spy_3m", "CW") == pytest.approx(0.45)
     assert next_earnings_date(vf, "CW") == "2026-07-30"
     assert len(vf.metric("iv_expiration", ticker="CW")) == 3
 
@@ -140,7 +144,7 @@ def test_provider_fetches_parses_caches_and_serves_from_cache(tmp_path, monkeypa
     monkeypatch.setattr(TastytradeProvider, "_get", fake_get)
 
     prov = TastytradeProvider(
-        username="u", password="p", base_url="https://x", user_agent="t/0", max_retries=1
+        client_secret="s", refresh_token="r", base_url="https://x", user_agent="t/0", max_retries=1
     )
 
     vf = prov.get_volatility(["CW", "WES"])
@@ -156,12 +160,32 @@ def test_provider_fetches_parses_caches_and_serves_from_cache(tmp_path, monkeypa
 
 
 def test_available_reads_env(monkeypatch):
-    monkeypatch.delenv("TASTYTRADE_USERNAME", raising=False)
-    monkeypatch.delenv("TASTYTRADE_PASSWORD", raising=False)
+    for var in ("TASTYTRADE_CLIENT_SECRET", "TASTYTRADE_REFRESH_TOKEN", "TT_SECRET", "TT_REFRESH"):
+        monkeypatch.delenv(var, raising=False)
     assert TastytradeProvider.available() is False
-    monkeypatch.setenv("TASTYTRADE_USERNAME", "u")
-    monkeypatch.setenv("TASTYTRADE_PASSWORD", "p")
+    monkeypatch.setenv("TASTYTRADE_CLIENT_SECRET", "s")
+    monkeypatch.setenv("TASTYTRADE_REFRESH_TOKEN", "r")
     assert TastytradeProvider.available() is True
+
+
+def test_oauth_login_builds_bearer_header(monkeypatch):
+    calls = {}
+
+    def fake_post(self, path, json):  # noqa: ARG001
+        calls["path"] = path
+        calls["json"] = json
+        return {"access_token": "abc", "expires_in": 900}
+
+    monkeypatch.setattr(TastytradeProvider, "_post", fake_post)
+    prov = TastytradeProvider(client_secret="s", refresh_token="r", base_url="https://x")
+
+    headers = prov._headers(auth=True)
+    assert headers["Authorization"] == "Bearer abc"   # OAuth2 Bearer, not raw token
+    assert headers["Accept-Version"]                  # version header sent
+    assert calls["path"] == "/oauth/token"
+    assert calls["json"]["grant_type"] == "refresh_token"
+    assert calls["json"]["client_secret"] == "s"
+    assert calls["json"]["refresh_token"] == "r"
 
 
 # --------------------------------------------------------------------------
@@ -173,6 +197,7 @@ def test_overlay_cw_downside_block_and_flags():
 
     assert ov["iv_rank"] == pytest.approx(62.0)
     assert ov["iv_percentile"] == pytest.approx(71.0)
+    assert ov["iv_hv_30_day_diff"] == pytest.approx(0.05)
     assert ov["expected_move_30d_pct"] == pytest.approx(0.2850 * math.sqrt(30 / 365.0))
     assert ov["days_to_earnings"] == 61
 
