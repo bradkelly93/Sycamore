@@ -138,7 +138,15 @@ def _index_frame(dossiers: list[Dossier]) -> pd.DataFrame:
 def _ensure_universe() -> pd.DataFrame:
     uni = load_universe()
     if uni is None or uni.empty:
-        uni = build_universe()   # builds from data/raw holdings CSVs
+        try:
+            uni = build_universe()   # builds from data/raw holdings CSVs
+        except FileNotFoundError as exc:
+            raise FileNotFoundError(
+                "No universe available for the --sector / --sycamore-only / top-N modes. "
+                "Either (a) drop the iShares IWS/IWN holdings CSVs in data/raw/ and run "
+                "`build-universe`, or (b) pass explicit tickers, e.g. "
+                "`pipeline CW WES UMBF LECO MTDR`."
+            ) from exc
     return uni
 
 

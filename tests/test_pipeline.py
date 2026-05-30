@@ -141,3 +141,14 @@ def test_pipeline_sycamore_only_filter(stubbed):
     # Only AAA is Sycamore-owned AND industrials-screened in the stub.
     assert "AAA" in res.shortlist
     assert "BBB" not in res.shortlist
+
+
+def test_pipeline_no_universe_gives_actionable_error(monkeypatch):
+    monkeypatch.setattr(pl, "load_universe", lambda: None)
+
+    def _no_csvs():
+        raise FileNotFoundError("No holdings CSVs found in data/raw/.")
+
+    monkeypatch.setattr(pl, "build_universe", _no_csvs)
+    with pytest.raises(FileNotFoundError, match="explicit tickers"):
+        pl.run_pipeline(sector="industrials")
