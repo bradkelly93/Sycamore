@@ -232,6 +232,45 @@ the **bear** case is the first data column and carries the loudest styling.
 > test suite asserts the formula strings and proves the arithmetic matches the
 > engine; only Excel proves evaluation.
 
+### Phase 6 — Pipeline (one funnel, minimal intervention)
+
+`pipeline` chains every phase into a single **downside-first funnel** — you run
+one command and review a ranked shortlist:
+
+```
+universe → screen → shortlist (3-attribute) → per name: comps + model → ranked index
+```
+
+```bash
+sycamore-prep pipeline                                   # top-10 of the universe
+sycamore-prep pipeline --sector industrials --top 15     # sector slice
+sycamore-prep pipeline --sycamore-only                   # only names Sycamore owns
+sycamore-prep pipeline CW UMBF LECO                       # explicit list (skips the screen)
+sycamore-prep pipeline --sector banks --sycamore-only --top 5   # filters compose
+sycamore-prep pipeline --link-spinoffs                   # also flag recent spin-offs
+```
+
+Writes a self-contained run folder `data/cache/pipeline_<timestamp>/` (gitignored)
+with one **dossier per name** (`<T>/comps_<T>.xlsx` + `<T>_model.xlsx`), a
+downside-first **ranked index** (`index.xlsx` + `index.md`, margin-of-safety and
+flags next to the three sub-scores), and a **`manifest.json`** (run params, the
+peers used per name, and cache timestamps for reproducibility).
+
+Clever bits, all reusing the existing engines (no recompute):
+- **Cache = coordination.** Re-runs are idempotent/resumable and offline-replayable;
+  only missing/stale data is re-pulled (`--refresh` forces a full re-pull).
+- **Peer auto-selection.** Uses `config.peers[ticker]` when present, else derives a
+  peer set from the universe by **GICS sector + nearest market cap**
+  (`--no-auto-peers` to disable) — so any shortlisted name gets a comp set.
+- **Cross-phase signal.** `is_bank` picks the model variant automatically;
+  `--link-spinoffs` flags shortlisted names that appear in a recent Form-10 scan
+  (run a targeted `build-models <PARENT> --spinco <SPINCO>` for an SOTP).
+- **Resilient.** One bad name is recorded as a visible error row, never kills the run.
+
+> **Network.** The screen + comps steps pull from EDGAR/yfinance, so run the
+> pipeline where SEC is reachable. The selection, peer-derivation, and
+> index/manifest assembly logic are fully offline-tested.
+
 ## Notes on the remote execution sandbox
 
 The Claude Code on the web container's egress policy blocks

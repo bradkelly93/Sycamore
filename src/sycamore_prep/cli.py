@@ -10,6 +10,7 @@ from .adapters import EdgarProvider
 from .comps import run_comps
 from .config import cache_dir, load_config
 from .models import build_models
+from .pipeline import run_pipeline
 from .screener import run_screener
 from .spinoffs.tracker import load_tracker, run_scan, run_track
 from .universe.builder import build_universe, load_universe
@@ -244,6 +245,57 @@ def build_models_cmd(
         typer.echo("  reverse DCF: N/A (bank) — P/TBV + normalized EPS instead")
     typer.echo("  Open in Excel: confirm no #REF!/#DIV0!, the reverse-DCF residual ≈ 0, "
                "and the bear column flexes. Re-solve implied growth with Goal Seek.")
+
+
+@app.command("pipeline")
+def pipeline_cmd(
+    tickers: list[str] = typer.Argument(
+        None, help="Explicit tickers; if omitted, screens the universe and takes the top-N."
+    ),
+    sector: str = typer.Option(None, "--sector", help="Restrict the funnel to a GICS sector substring."),
+    sycamore_only: bool = typer.Option(
+        False, "--sycamore-only", help="Only names in the Sycamore-owned overlay."
+    ),
+    top: int = typer.Option(10, "--top", help="How many shortlisted names to fully work up."),
+    wacc: float = typer.Option(None, "--wacc", help="Override WACC (default config)."),
+    terminal_growth: float = typer.Option(None, "--terminal-growth", help="Override perpetuity growth."),
+    years: int = typer.Option(None, "--years", help="Forecast horizon (default config)."),
+    no_auto_peers: bool = typer.Option(
+        False, "--no-auto-peers", help="Disable auto peer derivation; use only config.peers."
+    ),
+    link_spinoffs: bool = typer.Option(
+        False, "--link-spinoffs", help="Flag shortlisted names that appear in a recent spin-off scan."
+    ),
+    skip_market_cap: bool = typer.Option(
+        False, "--skip-market-cap", help="Skip yfinance market-cap fetch in the screen step."
+    ),
+    output: Path = typer.Option(None, "--output", "-o", help="Run-folder path (default data/cache/pipeline_<ts>)."),
+    refresh: bool = typer.Option(False, "--refresh", help="Bypass caches; re-pull fundamentals + prices."),
+) -> None:
+    """End-to-end funnel: universe → screen → shortlist → comps + model per name.
+
+    Writes a self-contained run folder: one dossier per name (comps tear-sheet +
+    model workbook) plus a downside-first ranked index (xlsx + md) and a run
+    manifest. Selection modes compose (top-N / --sycamore-only / --sector /
+    explicit tickers). Cache-backed, so re-runs only re-pull what's missing.
+    """
+    res = run_pipeline(
+        tickers=list(tickers) if tickers else None,
+        sector=sector, sycamore_only=sycamore_only, top=top,
+        wacc=wacc, terminal_growth=terminal_growth, forecast_years=years,
+        auto_peers=not no_auto_peers, link_spinoffs=link_spinoffs,
+        skip_market_cap=skip_market_cap, output_dir=output, refresh=refresh,
+    )
+    typer.secho(f"Worked up {len(res.dossiers)} name(s) → {res.out_dir}", fg=typer.colors.GREEN)
+    typer.echo(f"  ranked index → {res.index_xlsx}")
+    typer.echo(f"  manifest     → {res.manifest_path}")
+    for d in res.dossiers:
+        mos = f"{d.margin_of_safety_base * 100:.1f}%" if isinstance(d.margin_of_safety_base, float) \
+            and d.margin_of_safety_base == d.margin_of_safety_base else "n/a"
+        tag = "BANK" if d.is_bank else "    "
+        flag = f"  ⚠ {d.ns_flags}" if d.ns_flags else ""
+        err = f"  ERROR: {d.error}" if d.error else ""
+        typer.echo(f"  [{tag}] {d.ticker:<6} base MoS {mos:>7}  peers: {d.peers_used or 'none'}{flag}{err}")
 
 
 spin_app = typer.Typer(

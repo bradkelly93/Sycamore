@@ -715,15 +715,19 @@ def build_models(
     spinco: str | None = None,
     output_path: Path | str | None = None,
     refresh: bool = False,
+    comps_result: CompsResult | None = None,
 ) -> ModelBuildResult:
     """Pull (via the Phase-3/4 engines), seed, and write models/<TICKER>_model.xlsx.
 
     Reuses ``run_comps`` for all valuation numbers and ``run_track`` for the SOTP
     SpinCo leg. ``shares`` / ``net_debt`` / ``tbv_per_share`` are read from the
     same cached FinancialsFrame the DCF used, so the workbook ties to the CLI.
+
+    Pass ``comps_result`` to reuse an already-computed CompsResult (the pipeline
+    does this so comps is run once for both the tear-sheet and the model).
     """
     ticker = ticker.upper()
-    comps = run_comps(
+    comps = comps_result if comps_result is not None else run_comps(
         ticker, peers, wacc=wacc, terminal_growth=terminal_growth,
         forecast_years=forecast_years, share_basis=share_basis,
         output_path=None, fetch_prices=True, refresh=refresh,
