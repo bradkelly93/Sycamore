@@ -53,3 +53,20 @@ def test_missing_ticker_column_raises(tmp_path: Path, monkeypatch):
     monkeypatch.setattr(csv_mod, "raw_dir", lambda: tmp_path)
     with pytest.raises(ValueError):
         CsvScreenProvider().get_screen()
+
+
+def test_regime_label_to_pass_mapping(tmp_path: Path, monkeypatch):
+    # A verbatim export: every name + a regime label, no passes_screen column.
+    (tmp_path / _csv_name()).write_text(
+        "ticker,regime\nAAA,Bull\nBBB,Moderate Bear\nCCC,Moderate Bull\n"
+    )
+    monkeypatch.setattr(csv_mod, "raw_dir", lambda: tmp_path)
+    tv = load_config().tradingview
+    monkeypatch.setattr(tv, "signal_column", "regime")
+    monkeypatch.setattr(tv, "pass_values", ["Bull", "Moderate Bull"])
+
+    out = CsvScreenProvider().get_screen().set_index("ticker")
+    assert bool(out.loc["AAA", "passes_screen"]) is True    # in pass_values
+    assert bool(out.loc["BBB", "passes_screen"]) is False    # not in pass_values
+    assert bool(out.loc["CCC", "passes_screen"]) is True
+    assert out.loc["BBB", "regime"] == "Moderate Bear"       # label still carried

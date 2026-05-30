@@ -48,6 +48,12 @@ tradingview:
   #   api -> replicate a built-in TradingView Stock Screener live (RSI/SMA/...).
   mode: csv
   csv_file: trend_chameleon.csv      # drop in data/raw/ ; needs a `ticker` column
+  # If your export lists EVERY name with a label column (e.g. the regime), set
+  # these so membership is derived from the label (also shown as tv_<col>) and
+  # you can dump the export verbatim. Leave signal_column empty to instead treat
+  # every row in the file as a pass.
+  signal_column: ""                  # e.g. "regime"
+  pass_values: []                    # e.g. ["Bull", "Moderate Bull"]
   divergence_strong_pctile: 0.70     # "strong fundamentals" cut on the PURE composite
 
   # --- used only when mode: api (built-in Stock Screener) --------------------

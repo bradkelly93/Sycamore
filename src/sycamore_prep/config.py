@@ -42,6 +42,8 @@ class TradingViewConfig(BaseModel):
     enabled: bool = False
     mode: str = "api"                                        # "api" (live screener) | "csv" (dropped file)
     csv_file: str = "tradingview_screen.csv"                 # under data/raw/ when mode == "csv"
+    signal_column: str = ""                                  # CSV label column, e.g. "regime"
+    pass_values: list[str] = Field(default_factory=list)     # label values that count as "passes"
     region: str = "america"
     select: list[str] = Field(default_factory=list)          # carried indicators
     filters: list[dict] = Field(default_factory=list)        # {field, op, value}

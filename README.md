@@ -115,6 +115,10 @@ NYSE:CW,false,Moderate Bear
 - `passes_screen` — optional. If omitted, **presence in the file = passes** (so
   you can just export the names your indicator currently likes).
 - any other columns (e.g. `regime`, a score) are carried through as `tv_<col>`.
+- to dump a full export verbatim (every name + a label column), set
+  `tradingview.signal_column` (e.g. `regime`) and `tradingview.pass_values`
+  (e.g. `["Bull","Moderate Bull"]`) — membership is then derived from the label
+  so you don't hand-filter.
 
 How to produce it: TradingView's **Pine Screener** (Screener → add your
 indicator → run over a watchlist → export), an alert log, or by hand. Re-export

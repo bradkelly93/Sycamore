@@ -55,12 +55,23 @@ class CsvScreenProvider(TechnicalScreenProvider):
                 f"{path.name} needs a `ticker` column. Found: {list(raw.columns)}"
             )
         pcol = next((c for c in raw.columns if c.lower() in _PASS_COLS), None)
+        scol = (
+            next((c for c in raw.columns if c.lower() == cfg.signal_column.lower()), None)
+            if cfg.signal_column else None
+        )
 
         out = pd.DataFrame()
         # `EXCHANGE:SYMBOL` -> bare uppercase symbol (keep the class-share dot).
         out["ticker"] = raw[tcol].astype(str).str.split(":").str[-1].str.strip().str.upper()
-        # Explicit pass column if present; otherwise presence in the file == pass.
-        out["passes_screen"] = raw[pcol].map(_to_bool) if pcol else True
+        # Membership precedence: an explicit passes column > a regime/label column
+        # mapped via tradingview.pass_values > presence in the file == passes.
+        if pcol:
+            out["passes_screen"] = raw[pcol].map(_to_bool)
+        elif scol and cfg.pass_values:
+            keep = {str(v).strip().lower() for v in cfg.pass_values}
+            out["passes_screen"] = raw[scol].astype(str).str.strip().str.lower().isin(keep)
+        else:
+            out["passes_screen"] = True
         # Carry every other column through, coercing to numeric where possible.
         for c in raw.columns:
             if c == tcol or c == pcol:
