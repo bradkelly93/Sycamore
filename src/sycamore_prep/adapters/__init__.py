@@ -9,6 +9,7 @@ from .base import (
 from .edgar import EdgarProvider
 from .yfinance_provider import YFinanceProvider
 from .tradingview import TradingViewProvider
+from .csv_screen import CsvScreenProvider
 
 __all__ = [
     "FundamentalsProvider",
@@ -18,4 +19,5 @@ __all__ = [
     "EdgarProvider",
     "YFinanceProvider",
     "TradingViewProvider",
+    "CsvScreenProvider",
 ]

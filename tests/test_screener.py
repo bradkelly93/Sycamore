@@ -11,11 +11,13 @@ import pandas as pd
 import pytest
 
 from sycamore_prep.adapters import cache as cache_mod
+from sycamore_prep.adapters.csv_screen import CsvScreenProvider
 from sycamore_prep.adapters.edgar import EdgarProvider
-from sycamore_prep.adapters.tradingview import TradingViewProvider, SOURCE_TAG
+from sycamore_prep.adapters.tradingview import SOURCE_TAG, TradingViewProvider
 from sycamore_prep.screener import run_screener
+from sycamore_prep.screener import screen as screen_mod
 from sycamore_prep.screener.scoring import score_universe
-from sycamore_prep.screener.screen import _tv_divergence
+from sycamore_prep.screener.screen import _tv_divergence, _tv_provider
 
 
 FIXTURE_DIR = Path(__file__).parent / "fixtures"
@@ -173,10 +175,22 @@ def _fake_tv_df():
     })
 
 
+class _StubProvider:
+    """Stand-in technical-screen provider so overlay tests stay mode-agnostic."""
+
+    def __init__(self, frame=None, boom=False):
+        self._frame = frame
+        self._boom = boom
+
+    def get_screen(self, refresh: bool = False):
+        if self._boom:
+            raise RuntimeError("tradingview endpoint down")
+        return self._frame
+
+
 def test_overlay_does_not_change_composite(patched_adapters: Path, monkeypatch):
-    monkeypatch.setattr(
-        TradingViewProvider, "get_screen", lambda self, refresh=False: _fake_tv_df()
-    )
+    monkeypatch.setattr(screen_mod, "_tv_provider",
+                        lambda mode: _StubProvider(_fake_tv_df()))
     base = run_screener(
         tickers=["AAA", "BBB"], skip_market_cap=True,
         output_path=patched_adapters / "base.xlsx",
@@ -204,9 +218,8 @@ def test_overlay_does_not_change_composite(patched_adapters: Path, monkeypatch):
 
 
 def test_overlay_columns_are_in_tail(patched_adapters: Path, monkeypatch):
-    monkeypatch.setattr(
-        TradingViewProvider, "get_screen", lambda self, refresh=False: _fake_tv_df()
-    )
+    monkeypatch.setattr(screen_mod, "_tv_provider",
+                        lambda mode: _StubProvider(_fake_tv_df()))
     out = run_screener(
         tickers=["AAA", "BBB"], skip_market_cap=True,
         output_path=patched_adapters / "tail.xlsx", tv_overlay=True,
@@ -218,10 +231,8 @@ def test_overlay_columns_are_in_tail(patched_adapters: Path, monkeypatch):
 
 
 def test_overlay_resilient_on_tv_failure(patched_adapters: Path, monkeypatch):
-    def _boom(self, refresh=False):
-        raise RuntimeError("tradingview endpoint down")
-
-    monkeypatch.setattr(TradingViewProvider, "get_screen", _boom)
+    monkeypatch.setattr(screen_mod, "_tv_provider",
+                        lambda mode: _StubProvider(boom=True))
     out = run_screener(
         tickers=["AAA", "BBB"], skip_market_cap=True,
         output_path=patched_adapters / "fail.xlsx", tv_overlay=True,
@@ -230,6 +241,12 @@ def test_overlay_resilient_on_tv_failure(patched_adapters: Path, monkeypatch):
     assert out.loc["AAA", "composite_rank"] == 1
     assert pd.notna(out.loc["AAA", "q1_quality_score"])
     assert "passes_screen" not in out.columns
+
+
+def test_tv_provider_factory():
+    assert isinstance(_tv_provider("csv"), CsvScreenProvider)
+    assert isinstance(_tv_provider("api"), TradingViewProvider)
+    assert isinstance(_tv_provider("anything-else"), TradingViewProvider)
 
 
 def test_divergence_buckets():

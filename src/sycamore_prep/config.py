@@ -40,6 +40,8 @@ class TradingViewConfig(BaseModel):
     CLAUDE.md: bottom-up, downside-first). `filters` are AND-combined.
     """
     enabled: bool = False
+    mode: str = "api"                                        # "api" (live screener) | "csv" (dropped file)
+    csv_file: str = "tradingview_screen.csv"                 # under data/raw/ when mode == "csv"
     region: str = "america"
     select: list[str] = Field(default_factory=list)          # carried indicators
     filters: list[dict] = Field(default_factory=list)        # {field, op, value}

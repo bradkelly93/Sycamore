@@ -263,8 +263,6 @@ def _apply_tv_overlay(out: pd.DataFrame, tv_df: pd.DataFrame, tv_cfg) -> pd.Data
     downside-first). Carried indicators are prefixed `tv_` so provenance is
     obvious and nothing collides with a fundamental column.
     """
-    from ..adapters.tradingview import SOURCE_TAG
-
     out = out.copy()
     tv = tv_df.copy()
     if "ticker" in tv.columns:
@@ -281,10 +279,17 @@ def _apply_tv_overlay(out: pd.DataFrame, tv_df: pd.DataFrame, tv_cfg) -> pd.Data
 
     out["tv_asof"] = str(tv["asof"].iloc[0]) if ("asof" in tv.columns and len(tv)) else None
 
-    # Tag `sources` for rows that actually received TradingView data (passers).
+    # Tag `sources` for rows that actually received overlay data (passers). The
+    # tag is read from the frame itself, so it is correct for whichever provider
+    # (live API or dropped CSV) supplied it.
+    src_tag = (
+        str(tv["source"].iloc[0])
+        if ("source" in tv.columns and len(tv)) else "tradingview (non-primary, technical)"
+    )
+
     def _append_src(cur: object) -> str:
         cur = "" if cur is None or (isinstance(cur, float) and pd.isna(cur)) else str(cur)
-        return f"{cur}, {SOURCE_TAG}" if cur else SOURCE_TAG
+        return f"{cur}, {src_tag}" if cur else src_tag
     if "sources" in out.columns:
         out.loc[passes, "sources"] = out.loc[passes, "sources"].apply(_append_src)
 
@@ -296,6 +301,21 @@ def _apply_tv_overlay(out: pd.DataFrame, tv_df: pd.DataFrame, tv_cfg) -> pd.Data
         float(tv_cfg.divergence_strong_pctile),
     )
     return out
+
+
+def _tv_provider(mode: str):
+    """Pick the technical-overlay provider for the configured mode.
+
+    'csv' reads a dropped CSV (use this for a CUSTOM Pine indicator like Trend
+    Chameleon, whose output TradingView's scanner API cannot return); 'api'
+    replicates a built-in TradingView Stock Screener live. Both implement
+    TechnicalScreenProvider, so the overlay code downstream is identical.
+    """
+    if str(mode).lower() == "csv":
+        from ..adapters.csv_screen import CsvScreenProvider
+        return CsvScreenProvider()
+    from ..adapters.tradingview import TradingViewProvider
+    return TradingViewProvider()
 
 
 def run_screener(
@@ -397,8 +417,7 @@ def run_screener(
     cfg = load_config()
     if tv_overlay and cfg.tradingview.enabled:
         try:
-            from ..adapters.tradingview import TradingViewProvider
-            tv_df = TradingViewProvider().get_screen(refresh=refresh_tv)
+            tv_df = _tv_provider(cfg.tradingview.mode).get_screen(refresh=refresh_tv)
             out = _apply_tv_overlay(out, tv_df, cfg.tradingview)
         except Exception as exc:  # noqa: BLE001 — overlay must never break the screen
             print(f"[tv-overlay] skipped: {exc}", file=sys.stderr)
