@@ -260,6 +260,27 @@ def test_sotp_tab_only_with_spinoff(tmp_path):
     assert "forced_selling_window" in blob        # tracker downside flag surfaced
 
 
+def _notes_text(wb) -> str:
+    return "\n".join(
+        c.value for row in wb[SHEET_NOTES].iter_rows() for c in row
+        if isinstance(c.value, str)
+    )
+
+
+def test_spinoff_notes_warns_about_assumed_growth(tmp_path):
+    out = tmp_path / "CW_model.xlsx"
+    build_workbook(make_model_inputs(with_spinoff=True), out)
+    txt = _notes_text(load_workbook(out))
+    assert "RECENT SPIN-OFF" in txt
+    assert "ASSUMED_G" in txt
+
+
+def test_no_spinoff_no_warning(tmp_path):
+    out = tmp_path / "CW_model.xlsx"
+    build_workbook(make_model_inputs(), out)
+    assert "RECENT SPIN-OFF" not in _notes_text(load_workbook(out))
+
+
 # --------------------------------------------------------------------------- #
 # Thin end-to-end via the comps monkeypatch fixture (offline)
 # --------------------------------------------------------------------------- #

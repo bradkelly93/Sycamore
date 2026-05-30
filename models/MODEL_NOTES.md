@@ -139,6 +139,15 @@ revenue, share count, or a segment split. So:
   `forced_selling_window`) are surfaced at the bottom.
 This tab is emitted only with `--spinco`.
 
+> **Spin-off FCF caveat (auto-flagged on the Notes tab).** When you build a model
+> for a *recently spun parent*, its FCF history straddles the separation: the
+> latest FY drops as the SpinCo's cash flow leaves, so the 5y FCF CAGR that seeds
+> `ASSUMED_G` is artificially low and the trough/bull `FCFF₀` are distorted. The
+> base-case MoS can therefore *understate* fair value. **Sanity-check `ASSUMED_G`**
+> against post-spin run-rate growth (flex it on Inputs & Sources) before trusting
+> the DCF. Example: DHR post-Veralto seeds `ASSUMED_G` at the 2.5% floor and shows
+> a ~−50% base MoS — largely a spin artifact, not pure overvaluation.
+
 ## 7. Rebuilding from scratch
 1. Pull the data: `pull-fundamentals <TICKER>`, then `comps <TICKER>` (and
    `spinoffs track <PARENT> --spinco <SPINCO>` if relevant) to see the engine

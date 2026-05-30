@@ -611,6 +611,22 @@ def _sotp_tab(ws, mi, s, names) -> None:
 
 def _notes_tab(ws, mi, bank, has_dcf) -> None:
     st.title(ws, "Notes — read before using")
+    row = 2
+    # Recently-spun parents: FCF history straddles the separation, so the 5y FCF
+    # CAGR (which seeds ASSUMED_G) and the bear/bull FCFF0 are distorted by the
+    # SpinCo's departure. Flag it loudly — this is a real downside-first trap.
+    if mi.spinoff is not None:
+        spinco = mi.spinoff.spinco_name or mi.spinoff.spinco_ticker or "the SpinCo"
+        warn = ws.cell(row=row, column=1, value=(
+            f"⚠ RECENT SPIN-OFF ({spinco}): this parent's FCF history straddles the "
+            "separation, so the 5y FCF CAGR that seeds ASSUMED_G — and the trough/bull "
+            "FCFF₀ — are distorted (the latest year drops as the SpinCo leaves). Sanity-"
+            "check ASSUMED_G against post-spin run-rate growth before trusting the MoS; "
+            "the base case may understate fair value. Flex it on Inputs & Sources."))
+        warn.font = Font(bold=True, color="C00000")
+        row += 1
+        ws.cell(row=row, column=1, value="")
+        row += 1
     lines = [
         "",
         "These are REBUILDABLE SKELETONS seeded from a live pull. DO NOT present them in an "
@@ -632,8 +648,9 @@ def _notes_tab(ws, mi, bank, has_dcf) -> None:
     if bank:
         lines.append("Bank: FCFF DCF and SOTP are omitted (not meaningful). Valuation = P/TBV + "
                      "normalized EPS; football field uses P/E + P/TBV bands.")
-    for i, t in enumerate(lines, start=2):
-        ws.cell(row=i, column=1, value=t)
+    for t in lines:
+        ws.cell(row=row, column=1, value=t)
+        row += 1
     st.set_widths(ws, {1: 110})
 
 
