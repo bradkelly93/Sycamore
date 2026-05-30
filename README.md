@@ -90,13 +90,59 @@ pulled fundamentals before this was added, re-pull with
 EV/EBITDA and net-debt/EBITDA fall back to an EBIT-only proxy that
 over-states leverage for D&A-heavy businesses (midstream, industrials).
 
+### Volatility overlay — tastytrade (downside cross-check)
+
+An optional overlay that adds an **options-implied downside read** beside the
+fundamental thesis. Sycamore's first principle is limiting permanent loss, so
+the market's price for risk on a name is a useful second opinion on margin of
+safety. It is **data-only**: your tastytrade account is used purely as an
+authenticated gateway to market-level volatility metrics — it never reads
+positions, never places orders, and **never feeds the three-attribute score**.
+It only annotates.
+
+Credentials come from the environment, never `config.yaml` (which is
+committed):
+
+```bash
+export TASTYTRADE_USERNAME=you@example.com
+export TASTYTRADE_PASSWORD='...'
+```
+
+Per-ticker overlay, and the screener annotated with vol columns:
+
+```bash
+sycamore-prep vol CW
+sycamore-prep vol CW --price 310 --mos-floor 280   # adds $ downside + MoS breach check
+sycamore-prep screen CW WES UMBF LECO MTDR --vol   # score/rank unchanged
+```
+
+What it surfaces (every row `source = tastytrade`, cached daily to
+`data/cache/volatility_<TICKER>.parquet`):
+
+- **IV rank / IV percentile** — how stressed the option market is on the name
+  vs. its trailing year (high = market pricing more risk).
+- **Expected move** (30-day and into the next earnings print) — the
+  option-implied 1-sigma move; the downside leg is what we report.
+- **`vol_flags`** — informational only: `elevated_iv_rank`, `high_iv_rank`,
+  `earnings_imminent`, `thin_liquidity`, `implied_downside_breaches_mos`.
+- **Margin-of-safety cross-check** — with `--price` and `--mos-floor`, flags
+  when the option-implied 1-sigma-down price punctures your floor (in Phase 3
+  that floor is the reverse-DCF downside).
+
+If credentials or network are unavailable the overlay **skips gracefully** —
+the screener still produces all fundamental output, with a one-line note. The
+`market-metrics` field mapping should be verified on your first authenticated
+run (the developer portal blocks automated doc fetches).
+
 ## Notes on the remote execution sandbox
 
 The Claude Code on the web container's egress policy blocks
 `www.sec.gov` and `data.sec.gov`. The EDGAR adapter is fully wired up, but
 `pull-fundamentals` must be run on a host where SEC endpoints are reachable
-(your laptop, or with a network policy that allows SEC). The universe
-builder, tests, and Excel scaffolds work offline.
+(your laptop, or with a network policy that allows SEC). The same applies to
+the tastytrade volatility overlay (`vol` / `screen --vol`): `api.tastytrade.com`
+must be reachable and `TASTYTRADE_USERNAME` / `TASTYTRADE_PASSWORD` set. The
+universe builder, tests, and Excel scaffolds work offline.
 
 ## Non-goals
 

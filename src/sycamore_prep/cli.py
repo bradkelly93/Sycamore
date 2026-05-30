@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import pandas as pd
 import typer
 
 from .adapters import EdgarProvider
@@ -113,11 +114,18 @@ def screen_cmd(
         help="Remove flagged names from the ranking entirely. Default keeps "
              "them visible (sub-scores shown) but sorted to the bottom.",
     ),
+    vol: bool = typer.Option(
+        False, "--vol",
+        help="Annotate with the tastytrade volatility overlay (downside "
+             "cross-check). Needs TASTYTRADE_USERNAME/PASSWORD; never scored.",
+    ),
 ) -> None:
     """Run the three-attribute quality-value screener.
 
     Sub-scores (Q1 Quality, Q2 Valuation, Q3 Improving Fundamentals) are
     reported separately per CLAUDE.md — composite_rank is only the sort key.
+    With --vol, IV rank/percentile + expected-move columns are appended as a
+    downside cross-check; they annotate, never move the score or rank.
     """
     df = run_screener(
         tickers=tickers or None,
@@ -126,6 +134,7 @@ def screen_cmd(
         output_path=output,
         skip_market_cap=skip_market_cap,
         hard_exclude_neg_space=hard_exclude,
+        with_vol=vol,
     )
     out = output or (cache_dir() / "screener_output.xlsx")
     typer.secho(f"Scored {len(df)} tickers → {out}", fg=typer.colors.GREEN)
@@ -133,8 +142,76 @@ def screen_cmd(
         "name", "composite_rank", "q1_quality_score",
         "q2_valuation_score", "q3_improving_score",
         "negative_space", "ns_flags",
+        "iv_rank", "iv_percentile", "expected_move_30d_pct", "vol_flags",
     ] if c in df.columns]
     typer.echo(df[cols_to_show].head(20).to_string())
+    note = df.attrs.get("vol_note")
+    if note:
+        typer.secho(note, fg=typer.colors.YELLOW)
+
+
+@app.command("vol")
+def vol_cmd(
+    tickers: list[str] = typer.Argument(..., help="One or more tickers (e.g., CW WES)."),
+    price: float = typer.Option(
+        None, "--price", help="Spot price — enables the $ downside + margin-of-safety check."
+    ),
+    mos_floor: float = typer.Option(
+        None, "--mos-floor",
+        help="Margin-of-safety floor price. Flags when the option-implied "
+             "1-sigma-down price punctures it (downside cross-check).",
+    ),
+    horizon: int = typer.Option(
+        None, "--horizon-days", help="Expected-move horizon in calendar days (default from config)."
+    ),
+    refresh: bool = typer.Option(False, "--refresh", help="Bypass today's cache and re-pull."),
+) -> None:
+    """Per-ticker volatility overlay (downside cross-check) from tastytrade.
+
+    DATA ONLY — reads market-level IV metrics for the named tickers; never
+    positions, never orders. Set TASTYTRADE_USERNAME / TASTYTRADE_PASSWORD in
+    the environment (never config.yaml).
+    """
+    from .adapters import TastytradeProvider
+    from .metrics.volatility import volatility_overlay
+
+    if not TastytradeProvider.available():
+        typer.secho(
+            "Set TASTYTRADE_USERNAME and TASTYTRADE_PASSWORD in your environment "
+            "first (never config.yaml).",
+            fg=typer.colors.RED,
+        )
+        raise typer.Exit(code=1)
+
+    horizon_days = horizon or load_config().tastytrade.horizon_days
+    try:
+        vf = TastytradeProvider().get_volatility(
+            [t.upper() for t in tickers], use_cache=not refresh
+        )
+    except Exception as exc:  # noqa: BLE001
+        typer.secho(f"tastytrade fetch failed: {exc}", fg=typer.colors.RED)
+        raise typer.Exit(code=1)
+
+    rows = [
+        volatility_overlay(vf, t, price=price, mos_floor=mos_floor, horizon_days=horizon_days)
+        for t in tickers
+    ]
+    df = pd.DataFrame(rows)
+    if df.empty or df["vol_source"].eq("").all():
+        typer.secho(
+            "No vol data returned (check tickers / market hours / API access).",
+            fg=typer.colors.YELLOW,
+        )
+        raise typer.Exit(code=1)
+    df["vol_flags"] = df["vol_flags"].apply(lambda v: ", ".join(v) if isinstance(v, list) else "")
+    show = [c for c in [
+        "ticker", "iv_rank", "iv_percentile", "iv_index",
+        "expected_move_30d_pct", "expected_move_earnings_pct",
+        "days_to_earnings", "next_earnings_date",
+        "sigma_down_30d_price", "vol_beta", "liquidity_rating", "vol_flags",
+    ] if c in df.columns]
+    typer.echo(df[show].to_string(index=False))
+    typer.secho("source: tastytrade — downside cross-check only", fg=typer.colors.GREEN)
 
 
 @app.command("config-check")

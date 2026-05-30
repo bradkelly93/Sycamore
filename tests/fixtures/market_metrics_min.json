@@ -1,0 +1,31 @@
+{
+  "data": {
+    "items": [
+      {
+        "symbol": "CW",
+        "implied-volatility-index": "0.2850",
+        "implied-volatility-index-5-day-change": "-0.0120",
+        "implied-volatility-index-rank": "0.62",
+        "implied-volatility-percentile": "0.71",
+        "liquidity-rating": "3",
+        "liquidity-rank": "0.55",
+        "beta": "1.05",
+        "earnings": {"expected-report-date": "2026-07-30", "time-of-day": "BMO"},
+        "option-expiration-implied-volatilities": [
+          {"expiration-date": "2026-06-19", "settlement-type": "PM", "option-chain-type": "Standard", "implied-volatility": "0.2600"},
+          {"expiration-date": "2026-07-17", "settlement-type": "PM", "option-chain-type": "Standard", "implied-volatility": "0.2900"},
+          {"expiration-date": "2026-08-21", "settlement-type": "PM", "option-chain-type": "Standard", "implied-volatility": "0.3100"}
+        ]
+      },
+      {
+        "symbol": "WES",
+        "implied-volatility-index": "0.3500",
+        "implied-volatility-index-rank": "0.18",
+        "implied-volatility-percentile": "0.25",
+        "liquidity-rating": "2",
+        "beta": "0.95",
+        "option-expiration-implied-volatilities": []
+      }
+    ]
+  }
+}

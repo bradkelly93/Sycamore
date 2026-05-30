@@ -60,6 +60,20 @@ NEG_SPACE_THRESHOLDS = {
     "fcf_margin_floor": 0.02,
 }
 
+# Volatility-overlay columns appended when run with --vol. These ANNOTATE the
+# screen (downside cross-check) and never enter the three-attribute score.
+VOL_COLUMNS = [
+    "iv_index", "iv_rank", "iv_percentile", "vol_beta", "liquidity_rating",
+    "expected_move_30d_pct", "expected_move_earnings_pct", "days_to_earnings",
+    "vol_flags", "vol_source",
+]
+
+
+def _join_flags(v) -> str:
+    if isinstance(v, list):
+        return ", ".join(v)
+    return "" if v is None else str(v)
+
 
 @dataclass
 class ScreenerRow:
@@ -89,6 +103,17 @@ class ScreenerRow:
     rev_growth_acceleration: float | None = None
     # Negative-space flags
     ns_flags: list[str] = field(default_factory=list)
+    # Volatility overlay (downside cross-check; NEVER feeds the score/rank).
+    iv_index: float | None = None
+    iv_rank: float | None = None
+    iv_percentile: float | None = None
+    vol_beta: float | None = None
+    liquidity_rating: float | None = None
+    expected_move_30d_pct: float | None = None
+    expected_move_earnings_pct: float | None = None
+    days_to_earnings: float | None = None
+    vol_flags: list[str] = field(default_factory=list)
+    vol_source: str = ""
     # Sources contributing to this row
     sources: str = ""
     error: str | None = None
@@ -194,6 +219,45 @@ def _compute_raw_row(
     return row
 
 
+def _enrich_rows_with_vol(rows: list[ScreenerRow]) -> str | None:
+    """Annotate rows in place with the tastytrade downside vol overlay.
+
+    Pure annotation — never affects scoring or ranking, never raises. Returns a
+    human-readable note when the overlay is skipped (no creds / fetch failure),
+    else None. Mirrors the screener's existing yfinance resilience.
+    """
+    from ..adapters import TastytradeProvider
+    from ..metrics.volatility import volatility_overlay
+
+    if not TastytradeProvider.available():
+        return (
+            "vol overlay skipped: set TASTYTRADE_USERNAME / TASTYTRADE_PASSWORD "
+            "to enable (data-only — no positions, no orders)."
+        )
+    tickers = [r.ticker for r in rows if r.error is None]
+    if not tickers:
+        return None
+    try:
+        vf = TastytradeProvider().get_volatility(tickers)
+    except Exception as exc:  # noqa: BLE001 — overlay is convenience data
+        return f"vol overlay skipped: {exc}"
+    for r in rows:
+        if r.error is not None:
+            continue
+        ov = volatility_overlay(vf, r.ticker)
+        r.iv_index = ov["iv_index"]
+        r.iv_rank = ov["iv_rank"]
+        r.iv_percentile = ov["iv_percentile"]
+        r.vol_beta = ov["vol_beta"]
+        r.liquidity_rating = ov["liquidity_rating"]
+        r.expected_move_30d_pct = ov["expected_move_30d_pct"]
+        r.expected_move_earnings_pct = ov["expected_move_earnings_pct"]
+        r.days_to_earnings = ov["days_to_earnings"]
+        r.vol_flags = ov["vol_flags"]
+        r.vol_source = ov["vol_source"]
+    return None
+
+
 def _candidate_tickers(
     universe: pd.DataFrame | None,
     explicit: Iterable[str] | None,
@@ -229,6 +293,7 @@ def run_screener(
     output_path: Path | str | None = None,
     skip_market_cap: bool = False,
     hard_exclude_neg_space: bool = False,
+    with_vol: bool = False,
 ) -> pd.DataFrame:
     """Run the three-attribute screen and write screener_output.xlsx.
 
@@ -277,12 +342,18 @@ def run_screener(
                     mcap = None
         rows.append(_compute_raw_row(ticker, name, sec, ff, mcap))
 
+    # Volatility overlay (downside cross-check) — annotation only, never scored.
+    vol_note = _enrich_rows_with_vol(rows) if with_vol else None
+
     raw = pd.DataFrame([r.__dict__ for r in rows]).set_index("ticker")
-    # Stringify list column for xlsx output.
-    raw["ns_flags"] = raw["ns_flags"].apply(
-        lambda v: ", ".join(v) if isinstance(v, list) else ""
-    )
+    # Stringify list columns for xlsx output.
+    raw["ns_flags"] = raw["ns_flags"].apply(_join_flags)
     raw["negative_space"] = raw["ns_flags"].fillna("").str.len() > 0
+    if with_vol and vol_note is None:
+        raw["vol_flags"] = raw["vol_flags"].apply(_join_flags)
+    else:
+        # No vol data produced — drop the empty overlay columns entirely.
+        raw = raw.drop(columns=[c for c in VOL_COLUMNS if c in raw.columns])
 
     # Score ALL names — sub-scores stay honest even for flagged names so the
     # three-axis decomposition is never hidden (CLAUDE.md principle 2). The
@@ -318,10 +389,19 @@ def run_screener(
         "composite_rank", "composite_score",
         "q1_quality_score", "q2_valuation_score", "q3_improving_score",
         "negative_space", "ns_flags",
+        # Volatility overlay (downside cross-check) — kept prominent, near the
+        # scores, per CLAUDE.md (downside at least as visible as upside).
+        "iv_rank", "iv_percentile", "iv_index",
+        "expected_move_30d_pct", "expected_move_earnings_pct",
+        "days_to_earnings", "vol_beta", "liquidity_rating", "vol_flags",
     ]
     front = [c for c in front if c in out.columns]
     rest = [c for c in out.columns if c not in front]
     out = out[front + rest]
+
+    # Surface the vol-overlay note (e.g. "skipped: no creds") without coupling
+    # library code to the CLI — the command reads it off the frame.
+    out.attrs["vol_note"] = vol_note
 
     output_path = Path(output_path) if output_path else (cache_dir() / "screener_output.xlsx")
     _write_screener_xlsx(out, output_path)

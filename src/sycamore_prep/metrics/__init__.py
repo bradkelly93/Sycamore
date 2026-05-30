@@ -44,6 +44,18 @@ from .bank import (
     net_interest_margin_fy,
     allowance_to_loans_fy,
 )
+from .volatility import (
+    expected_move_pct,
+    expected_move_price,
+    sigma_down_price,
+    put_skew,
+    implied_downside_breaches_mos,
+    iv_index,
+    iv_rank_pct,
+    iv_percentile_pct,
+    expected_move_into_earnings,
+    volatility_overlay,
+)
 
 __all__ = [
     "revenue_fy", "gross_profit_fy", "gross_margin_fy", "operating_margin_fy",
@@ -55,4 +67,7 @@ __all__ = [
     "pe_fy", "ev_ebitda_fy", "fcf_yield_fy", "p_tbv_fy",
     "percentile_vs_history",
     "is_bank", "net_interest_margin_fy", "allowance_to_loans_fy",
+    "expected_move_pct", "expected_move_price", "sigma_down_price", "put_skew",
+    "implied_downside_breaches_mos", "iv_index", "iv_rank_pct",
+    "iv_percentile_pct", "expected_move_into_earnings", "volatility_overlay",
 ]

@@ -34,11 +34,24 @@ class ValuationConfig(BaseModel):
     forecast_years: int = 10
 
 
+class TastytradeConfig(BaseModel):
+    """Non-secret settings for the volatility overlay.
+
+    Credentials are NEVER stored here (config.yaml is committed) — set
+    TASTYTRADE_USERNAME / TASTYTRADE_PASSWORD in the environment instead.
+    """
+
+    base_url: str = "https://api.tastytrade.com"
+    user_agent: str = "sycamore-prep/0.1 (volatility-overlay)"
+    horizon_days: int = 30
+
+
 class AppConfig(BaseModel):
     edgar: EdgarConfig
     cache: CacheConfig = Field(default_factory=CacheConfig)
     raw: RawConfig = Field(default_factory=RawConfig)
     valuation: ValuationConfig = Field(default_factory=ValuationConfig)
+    tastytrade: TastytradeConfig = Field(default_factory=TastytradeConfig)
     peers: dict[str, list[str]] = Field(default_factory=dict)
     test_tickers: list[str] = Field(default_factory=list)
 

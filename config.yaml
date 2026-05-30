@@ -25,6 +25,17 @@ valuation:
   terminal_growth: 0.025
   forecast_years: 10
 
+# Volatility overlay (tastytrade). DOWNSIDE CROSS-CHECK ONLY — reads
+# market-level IV metrics for names under research; never positions, never
+# orders. Credentials are NOT stored here (this file is committed): set
+#   export TASTYTRADE_USERNAME=...
+#   export TASTYTRADE_PASSWORD=...
+tastytrade:
+  base_url: "https://api.tastytrade.com"
+  user_agent: "sycamore-prep/0.1 (volatility-overlay)"
+  # Default expected-move horizon in calendar days.
+  horizon_days: 30
+
 # Peer maps for comps. Override per-run via CLI --peers.
 peers:
   CW:  ["HEI", "TDG", "MOG.A", "KTOS", "CACI"]
