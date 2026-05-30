@@ -10,7 +10,13 @@ import pandas as pd
 
 from sycamore_prep.adapters import cache as cache_mod
 from sycamore_prep.adapters.base import MARKET_COLUMNS
-from sycamore_prep.adapters.polymarket import PolymarketProvider, _as_list
+from sycamore_prep.adapters.polymarket import (
+    PolymarketProvider,
+    _as_list,
+    _category_for,
+    _coerce_market_objects,
+    _extract_markets_from_search,
+)
 
 
 FIXTURE_DIR = Path(__file__).parent / "fixtures"
@@ -65,3 +71,55 @@ def test_get_market_returns_outcomes_and_caches_snapshot(tmp_path, monkeypatch):
     # Snapshot cached keyed by slug + as_of date so the overlay can diff it.
     snaps = cache_mod.list_market_snapshots("spirit-airlines-bankruptcy-2026")
     assert len(snaps) == 1
+
+
+def test_get_market_uses_path_style_slug_endpoint(tmp_path, monkeypatch):
+    """Migrated off the deprecated `/markets?slug=` query form to the
+    path-style `/markets/slug/{slug}`, which returns a single market OBJECT."""
+    monkeypatch.setattr(cache_mod, "cache_dir", lambda: tmp_path)
+    prov = PolymarketProvider()
+    seen: dict = {}
+
+    def fake_get(url, params=None):
+        seen["url"] = url
+        seen["params"] = params
+        return _market()  # single object, not a list — the new shape
+
+    monkeypatch.setattr(prov, "_get", fake_get)
+    df = prov.get_market("spirit-airlines-bankruptcy-2026")
+    assert seen["url"].endswith("/markets/slug/spirit-airlines-bankruptcy-2026")
+    assert seen["params"] is None  # slug is in the path, not a query param
+    assert len(df) == 2  # single object coerced + parsed into 2 outcome rows
+
+
+def test_coerce_market_objects_handles_object_list_and_wrappers():
+    obj = {"slug": "x"}
+    assert _coerce_market_objects(obj) == [obj]              # single object
+    assert _coerce_market_objects([obj]) == [obj]            # list
+    assert _coerce_market_objects({"markets": [obj]}) == [obj]
+    assert _coerce_market_objects({"data": [obj]}) == [obj]
+    assert _coerce_market_objects(None) == []
+
+
+def test_search_folds_event_tags_into_category():
+    """Event-level tags (where Polymarket actually marks Crypto/Sports) get
+    folded into each market's `category` so discovery can filter on them."""
+    data = {
+        "events": [{
+            "slug": "btc-updown",
+            "title": "Bitcoin Up or Down",
+            "tags": [{"label": "Crypto"}, {"label": "Bitcoin"}, "Up or Down"],
+            "markets": [{"slug": "btc-updown-4h", "question": "Bitcoin Up or Down - ET",
+                         "outcomes": '["Yes","No"]', "outcomePrices": '["0.5","0.5"]'}],
+        }],
+    }
+    markets = _extract_markets_from_search(data)
+    assert len(markets) == 1
+    cat = markets[0]["category"]
+    assert "Crypto" in cat and "Bitcoin" in cat
+
+
+def test_category_for_reads_nested_event_tags():
+    market = {"slug": "m", "category": None,
+              "events": [{"tags": [{"label": "Tennis"}, {"label": "Sports"}]}]}
+    assert _category_for(market) == "Tennis, Sports"

@@ -24,6 +24,7 @@ import json
 import time
 from datetime import datetime, timezone
 from typing import Any
+from urllib.parse import quote
 
 import pandas as pd
 import requests
@@ -72,10 +73,66 @@ def _iso_date(v: Any) -> str | None:
         return None
 
 
+def _tag_labels(obj: dict[str, Any]) -> list[str]:
+    """Pull tag labels off an event/market. Gamma tags are a list of either
+    {"label": "Crypto", ...} dicts or bare strings; tolerate both."""
+    out: list[str] = []
+    for t in obj.get("tags", []) or []:
+        if isinstance(t, dict):
+            label = t.get("label") or t.get("slug")
+            if label:
+                out.append(str(label))
+        elif t:
+            out.append(str(t))
+    return out
+
+
+def _category_for(market: dict[str, Any], event: dict[str, Any] | None = None) -> str | None:
+    """Best-effort category/tag string for a market, used downstream to drop
+    crypto/sports/pop-culture noise. Polymarket leaves market-level `category`
+    null and carries the real signal in EVENT-level `tags`, so we fold the
+    market's own category/groupItemTitle together with the parent event's tags
+    (passed in for the search path, else read off the market's nested events).
+    Returns a comma-joined string, or None when nothing is available."""
+    parts: list[str] = []
+    for key in ("category", "groupItemTitle"):
+        v = market.get(key)
+        if v:
+            parts.append(str(v))
+    parts.extend(_tag_labels(market))
+    if event is not None:
+        parts.extend(_tag_labels(event))
+    else:
+        for ev in market.get("events", []) or []:
+            if isinstance(ev, dict):
+                parts.extend(_tag_labels(ev))
+    # De-dupe, preserve order.
+    seen: set[str] = set()
+    uniq = [p for p in parts if not (p in seen or seen.add(p))]
+    return ", ".join(uniq) if uniq else None
+
+
+def _coerce_market_objects(data: Any) -> list[dict[str, Any]]:
+    """Normalize a single-market response into a list of market dicts.
+    `/markets/slug/{slug}` returns one object; the legacy/keyset forms return a
+    list or a `{markets|data: [...]}` wrapper. Tolerate all of them."""
+    if data is None:
+        return []
+    if isinstance(data, list):
+        return [m for m in data if isinstance(m, dict)]
+    if isinstance(data, dict):
+        for key in ("markets", "data"):
+            if isinstance(data.get(key), list):
+                return [m for m in data[key] if isinstance(m, dict)]
+        return [data]
+    return []
+
+
 def _extract_markets_from_search(data: Any) -> list[dict[str, Any]]:
     """Gamma public-search returns {events: [{markets: [...]}], ...}. Flatten
     to a market list, tolerating either a flat array, a {markets:[...]} object,
-    or nested events."""
+    or nested events. Event-level tags are folded into each market's `category`
+    (the discovery layer's noise filter reads them)."""
     if isinstance(data, list):
         return data
     if not isinstance(data, dict):
@@ -90,6 +147,8 @@ def _extract_markets_from_search(data: Any) -> list[dict[str, Any]]:
             # Carry the event's slug/title down if the market lacks them.
             m.setdefault("slug", ev.get("slug"))
             m.setdefault("question", ev.get("title"))
+            # Fold event tags into category so noise filtering can see them.
+            m["category"] = _category_for(m, ev)
             out.append(m)
     return out
 
@@ -147,7 +206,9 @@ class PolymarketProvider(EventProbabilityProvider):
         if liquidity is None:
             liquidity = _to_float(obj.get("liquidity"))
         resolution = _iso_date(obj.get("endDate") or obj.get("end_date"))
-        category = obj.get("category") or obj.get("groupItemTitle") or None
+        # Prefer a category already folded in by search-flattening; otherwise
+        # derive it (incl. nested event tags) so get_market rows carry it too.
+        category = obj.get("category") or _category_for(obj)
         url = f"https://polymarket.com/event/{slug}" if slug else ""
 
         common = {
@@ -220,12 +281,21 @@ class PolymarketProvider(EventProbabilityProvider):
         return self._frame(rows)
 
     def get_market(self, slug: str) -> pd.DataFrame:
-        """Current snapshot for one market slug; caches it keyed by slug+date."""
+        """Current snapshot for one market slug; caches it keyed by slug+date.
+
+        Uses the path-style `GET /markets/slug/{slug}`. The legacy
+        `GET /markets?slug=` query form is deprecated (sunset 2026-05-01,
+        `Warning: use /markets/keyset`); the path form returns the same market
+        object with no deprecation headers. It responds with a single market
+        object (not an array), so normalize both shapes here.
+        """
         as_of = _utc_now_iso()
-        data = self._get(f"{self._gamma}/markets", params={"slug": slug})
-        markets = data if isinstance(data, list) else data.get("data", [])
+        try:
+            data = self._get(f"{self._gamma}/markets/slug/{quote(slug, safe='')}")
+        except Exception:  # noqa: BLE001 — fall back to the legacy query form
+            data = self._get(f"{self._gamma}/markets", params={"slug": slug})
         rows: list[dict[str, Any]] = []
-        for m in markets:
+        for m in _coerce_market_objects(data):
             rows.extend(self._parse_market(m, as_of))
         frame = self._frame(rows)
         if not frame.empty:
