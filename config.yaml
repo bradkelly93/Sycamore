@@ -36,30 +36,27 @@ peers:
 # Test tickers used in Phase 1 acceptance.
 test_tickers: ["CW", "WES", "UMBF", "LECO", "MTDR"]
 
-# TradingView technical overlay (NON-PRIMARY context; never enters the
-# three-attribute score). Surfaced by `screen --tv-overlay` as extra columns to
-# the RIGHT of the downside flags. See README "TradingView technical overlay".
+# Technical overlay (NON-PRIMARY context; never enters the three-attribute
+# score). Surfaced by `screen --tv-overlay` as extra columns to the RIGHT of the
+# downside flags. See README "TradingView technical overlay". mode selects source:
+#   trend -> transparent Bull/Neutral/Bear regime computed in Python from the
+#            prices we already pull (no TradingView account; fully auditable).
+#   csv   -> read data/raw/<csv_file> (e.g. a custom Pine indicator's tickers).
+#   api   -> replicate a built-in TradingView Stock Screener live (RSI/SMA/...).
 tradingview:
   enabled: true
-  # How the overlay is sourced:
-  #   csv -> read data/raw/<csv_file>. Use this for a CUSTOM Pine indicator
-  #          (e.g. Trend Chameleon): its output is NOT in TradingView's scanner
-  #          API, so you export the tickers it flags into a CSV.
-  #   api -> replicate a built-in TradingView Stock Screener live (RSI/SMA/...).
-  mode: csv
-  csv_file: trend_chameleon.csv      # drop in data/raw/ ; needs a `ticker` column
-  # If your export lists EVERY name with a label column (e.g. the regime), set
-  # these so membership is derived from the label (also shown as tv_<col>) and
-  # you can dump the export verbatim. Leave signal_column empty to instead treat
-  # every row in the file as a pass.
-  signal_column: ""                  # e.g. "regime"
-  pass_values: []                    # e.g. ["Bull", "Moderate Bull"]
+  mode: trend
   divergence_strong_pctile: 0.70     # "strong fundamentals" cut on the PURE composite
+  pass_values: ["Bull"]              # regime/label values that count as a "pass"
 
-  # --- used only when mode: api (built-in Stock Screener) --------------------
-  # Declarative replica of a built-in screen. AND-combined. {field, op, value}.
-  # op in: gt, lt, ge, le, eq, between, isin, above, below, crosses_above,
-  # crosses_below. For above/below/crosses_*, value is ANOTHER FIELD NAME.
+  # --- mode: csv ---
+  csv_file: trend_chameleon.csv      # drop in data/raw/ ; needs a `ticker` column
+  signal_column: ""                  # e.g. "regime" — derive pass from this label column
+
+  # --- mode: api (built-in Stock Screener) ---
+  # Declarative replica. AND-combined. {field, op, value}. op in: gt, lt, ge, le,
+  # eq, between, isin, above, below, crosses_above, crosses_below. For
+  # above/below/crosses_*, value is ANOTHER FIELD NAME.
   region: america
   select: ["close", "RSI", "SMA200", "volume", "market_cap_basic"]
   filters:

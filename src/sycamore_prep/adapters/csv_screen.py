@@ -35,7 +35,7 @@ def _to_bool(v: object) -> bool:
 class CsvScreenProvider(TechnicalScreenProvider):
     name = "tradingview-csv"
 
-    def get_screen(self, refresh: bool = False) -> pd.DataFrame:  # noqa: ARG002 — the file IS the cache
+    def get_screen(self, tickers=None, refresh: bool = False) -> pd.DataFrame:  # noqa: ARG002 — file-based; candidate list ignored
         cfg = load_config().tradingview
         path = raw_dir() / cfg.csv_file
         if not path.exists():

@@ -99,6 +99,16 @@ only, downside-first). It is added strictly to the *right* of the downside
 (`negative_space`/`ns_flags`) columns so margin-of-safety stays the most
 prominent read. Set `tradingview.mode` in `config.yaml`:
 
+**`mode: trend` (default) — a transparent regime computed in Python.**
+No TradingView account or dependency: a Bull/Neutral/Bear regime is derived for
+each name from the daily price history the screener already pulls — last close
+vs the 200-day SMA, the 50/200 SMA cross, and the slope of the 200-day. The raw
+drivers ride along (`tv_pct_above_200`, `tv_slope200_pct`) so the label is never
+a black box, and `tradingview.pass_values` (default `["Bull"]`) sets which
+regimes count as a "pass". This is the only fully-automatic, no-cost option, and
+the one you can actually defend in an interview. (First run pulls/caches daily
+prices per name, like market caps.)
+
 **`mode: csv` — for a CUSTOM Pine indicator (e.g. Trend Chameleon).**
 TradingView's scanner API does **not** expose the output of custom Pine
 indicators, so a live pull can't read them. Instead, export the tickers your

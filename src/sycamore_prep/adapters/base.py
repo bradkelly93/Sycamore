@@ -123,8 +123,12 @@ class TechnicalScreenProvider(ABC):
     name: str = "base"
 
     @abstractmethod
-    def get_screen(self, refresh: bool = False) -> pd.DataFrame:
-        """Return a tidy frame — one row per ticker the screen returned — with
-        at least `TECHNICAL_COLUMNS_REQUIRED` columns plus any carried
-        indicator columns. `refresh=True` bypasses the cache and re-pulls.
+    def get_screen(
+        self, tickers: Iterable[str] | None = None, refresh: bool = False
+    ) -> pd.DataFrame:
+        """Return a tidy frame — one row per ticker the screen evaluated — with
+        at least `TECHNICAL_COLUMNS_REQUIRED` columns plus any carried indicator
+        columns. `tickers` is the candidate set — providers that compute
+        per-ticker (e.g. the trend proxy) use it; set-based providers (live
+        screener, CSV) may ignore it. `refresh=True` bypasses any cache.
         """

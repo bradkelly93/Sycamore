@@ -182,7 +182,7 @@ class _StubProvider:
         self._frame = frame
         self._boom = boom
 
-    def get_screen(self, refresh: bool = False):
+    def get_screen(self, tickers=None, refresh: bool = False):
         if self._boom:
             raise RuntimeError("tradingview endpoint down")
         return self._frame
@@ -244,6 +244,8 @@ def test_overlay_resilient_on_tv_failure(patched_adapters: Path, monkeypatch):
 
 
 def test_tv_provider_factory():
+    from sycamore_prep.adapters.trend_regime import TrendRegimeProvider
+    assert isinstance(_tv_provider("trend"), TrendRegimeProvider)
     assert isinstance(_tv_provider("csv"), CsvScreenProvider)
     assert isinstance(_tv_provider("api"), TradingViewProvider)
     assert isinstance(_tv_provider("anything-else"), TradingViewProvider)

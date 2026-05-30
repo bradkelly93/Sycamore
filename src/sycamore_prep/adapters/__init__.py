@@ -10,6 +10,7 @@ from .edgar import EdgarProvider
 from .yfinance_provider import YFinanceProvider
 from .tradingview import TradingViewProvider
 from .csv_screen import CsvScreenProvider
+from .trend_regime import TrendRegimeProvider
 
 __all__ = [
     "FundamentalsProvider",
@@ -20,4 +21,5 @@ __all__ = [
     "YFinanceProvider",
     "TradingViewProvider",
     "CsvScreenProvider",
+    "TrendRegimeProvider",
 ]

@@ -306,12 +306,17 @@ def _apply_tv_overlay(out: pd.DataFrame, tv_df: pd.DataFrame, tv_cfg) -> pd.Data
 def _tv_provider(mode: str):
     """Pick the technical-overlay provider for the configured mode.
 
-    'csv' reads a dropped CSV (use this for a CUSTOM Pine indicator like Trend
-    Chameleon, whose output TradingView's scanner API cannot return); 'api'
-    replicates a built-in TradingView Stock Screener live. Both implement
+    'trend' computes a transparent Bull/Neutral/Bear regime in Python from the
+    prices we already pull (no TradingView dependency); 'csv' reads a dropped
+    CSV (e.g. a custom Pine indicator's flagged tickers); 'api' replicates a
+    built-in TradingView Stock Screener live. All implement
     TechnicalScreenProvider, so the overlay code downstream is identical.
     """
-    if str(mode).lower() == "csv":
+    m = str(mode).lower()
+    if m == "trend":
+        from ..adapters.trend_regime import TrendRegimeProvider
+        return TrendRegimeProvider()
+    if m == "csv":
         from ..adapters.csv_screen import CsvScreenProvider
         return CsvScreenProvider()
     from ..adapters.tradingview import TradingViewProvider
@@ -417,7 +422,9 @@ def run_screener(
     cfg = load_config()
     if tv_overlay and cfg.tradingview.enabled:
         try:
-            tv_df = _tv_provider(cfg.tradingview.mode).get_screen(refresh=refresh_tv)
+            tv_df = _tv_provider(cfg.tradingview.mode).get_screen(
+                tickers=list(out.index), refresh=refresh_tv
+            )
             out = _apply_tv_overlay(out, tv_df, cfg.tradingview)
         except Exception as exc:  # noqa: BLE001 — overlay must never break the screen
             print(f"[tv-overlay] skipped: {exc}", file=sys.stderr)

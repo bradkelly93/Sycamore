@@ -113,7 +113,7 @@ class TradingViewProvider(TechnicalScreenProvider):
             f"tradingview-screener call failed after {self._max_retries} retries"
         ) from last
 
-    def get_screen(self, refresh: bool = False) -> pd.DataFrame:
+    def get_screen(self, tickers=None, refresh: bool = False) -> pd.DataFrame:  # noqa: ARG002 — full-market screen; candidate list ignored
         """Pull the user's saved screen once and return a tidy membership frame.
 
         Single scanner call (the full passing set for the region) + a high limit;
