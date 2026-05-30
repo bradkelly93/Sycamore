@@ -90,6 +90,45 @@ pulled fundamentals before this was added, re-pull with
 EV/EBITDA and net-debt/EBITDA fall back to an EBIT-only proxy that
 over-states leverage for D&A-heavy businesses (midstream, industrials).
 
+#### TradingView technical overlay (non-primary context)
+
+You can overlay your **own saved TradingView technical screen** onto the
+fundamental output. This is an opt-in, **non-primary context** layer — by
+design it **never enters the Q1/Q2/Q3 sub-scores, the composite, or the rank**
+(per `CLAUDE.md`: bottom-up only, downside-first). It is added strictly to the
+*right* of the downside (`negative_space`/`ns_flags`) columns so margin-of-safety
+stays the most prominent read.
+
+Transcribe your screen's conditions into the `tradingview:` block in
+`config.yaml` (declarative `{field, op, value}` filters, AND-combined), then:
+
+```bash
+sycamore-prep screen CW WES UMBF LECO MTDR --tv-overlay
+sycamore-prep screen --sector industrials --tv-overlay --refresh-tv   # force re-pull
+```
+
+The overlay adds, per name: `passes_screen` (is the ticker in your screen),
+the carried indicators (`tv_close`, `tv_RSI`, ...), `tv_asof` (snapshot time —
+technicals go stale fast), and a neutral **`tv_divergence`** flag derived
+*after the fact* from the **pure** composite crossed with screen membership:
+
+| `tv_divergence` | meaning | downside-first reading |
+|---|---|---|
+| `agree_strong` | strong fundamentals **and** passes the screen | thesis and tape agree |
+| `agree_weak` | weak fundamentals **and** fails the screen | neither likes it |
+| `diverge_fund_strong_tech_fail` | strong fundamentals, fails the screen | **research prompt, not a signal** — ask what the tape may be pricing that the filings haven't shown yet; re-examine the bear case. Score is unchanged. |
+| `diverge_fund_weak_tech_pass` | weak fundamentals, passes the screen | **do-not-chase prompt** — technical strength is not a reason to override weak quality/valuation. Score is unchanged. |
+
+`tv_divergence` is interpretive overlay only — it does **not** move the rank.
+
+**Caveats.** `tradingview-screener` is an *unofficial* client; the endpoint can
+change. Anonymous access returns **delayed** data (the safe default here);
+realtime fields require your own TradingView `sessionid` (set
+`tradingview.sessionid` or export `TV_SESSIONID`). `.where()` filters are
+AND-only; a screen needing OR logic must be hand-written. If the pull fails for
+any reason, the screen still produces the full fundamental output with the TA
+columns simply absent.
+
 ## Notes on the remote execution sandbox
 
 The Claude Code on the web container's egress policy blocks

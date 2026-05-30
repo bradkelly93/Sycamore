@@ -34,11 +34,27 @@ class ValuationConfig(BaseModel):
     forecast_years: int = 10
 
 
+class TradingViewConfig(BaseModel):
+    """Declarative replica of the analyst's own saved TradingView technical
+    screen. NON-PRIMARY context overlay only — never enters the score (see
+    CLAUDE.md: bottom-up, downside-first). `filters` are AND-combined.
+    """
+    enabled: bool = False
+    region: str = "america"
+    select: list[str] = Field(default_factory=list)          # carried indicators
+    filters: list[dict] = Field(default_factory=list)        # {field, op, value}
+    cache_ttl_minutes: int = 1440                            # EOD-flavored snapshot
+    max_results: int = 20000
+    divergence_strong_pctile: float = 0.70                   # cut on PURE composite
+    sessionid: str | None = None                            # realtime needs your own
+
+
 class AppConfig(BaseModel):
     edgar: EdgarConfig
     cache: CacheConfig = Field(default_factory=CacheConfig)
     raw: RawConfig = Field(default_factory=RawConfig)
     valuation: ValuationConfig = Field(default_factory=ValuationConfig)
+    tradingview: TradingViewConfig = Field(default_factory=TradingViewConfig)
     peers: dict[str, list[str]] = Field(default_factory=dict)
     test_tickers: list[str] = Field(default_factory=list)
 

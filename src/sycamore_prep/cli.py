@@ -113,6 +113,16 @@ def screen_cmd(
         help="Remove flagged names from the ranking entirely. Default keeps "
              "them visible (sub-scores shown) but sorted to the bottom.",
     ),
+    tv_overlay: bool = typer.Option(
+        False, "--tv-overlay",
+        help="Append your TradingView technical-screen membership + divergence "
+             "flags as a NON-PRIMARY overlay. Never enters the score or rank. "
+             "Requires tradingview.enabled + filters in config.yaml.",
+    ),
+    refresh_tv: bool = typer.Option(
+        False, "--refresh-tv",
+        help="Bypass the cached TradingView screen snapshot and re-pull.",
+    ),
 ) -> None:
     """Run the three-attribute quality-value screener.
 
@@ -126,6 +136,8 @@ def screen_cmd(
         output_path=output,
         skip_market_cap=skip_market_cap,
         hard_exclude_neg_space=hard_exclude,
+        tv_overlay=tv_overlay,
+        refresh_tv=refresh_tv,
     )
     out = output or (cache_dir() / "screener_output.xlsx")
     typer.secho(f"Scored {len(df)} tickers → {out}", fg=typer.colors.GREEN)
@@ -133,6 +145,7 @@ def screen_cmd(
         "name", "composite_rank", "q1_quality_score",
         "q2_valuation_score", "q3_improving_score",
         "negative_space", "ns_flags",
+        "passes_screen", "tv_divergence",
     ] if c in df.columns]
     typer.echo(df[cols_to_show].head(20).to_string())
 

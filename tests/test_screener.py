@@ -12,8 +12,10 @@ import pytest
 
 from sycamore_prep.adapters import cache as cache_mod
 from sycamore_prep.adapters.edgar import EdgarProvider
+from sycamore_prep.adapters.tradingview import TradingViewProvider, SOURCE_TAG
 from sycamore_prep.screener import run_screener
 from sycamore_prep.screener.scoring import score_universe
+from sycamore_prep.screener.screen import _tv_divergence
 
 
 FIXTURE_DIR = Path(__file__).parent / "fixtures"
@@ -155,3 +157,92 @@ def test_hard_exclude_drops_flagged_from_ranking(patched_adapters: Path):
     assert pd.isna(out.loc["BBB", "composite_rank"])
     # The clean name still gets a real rank.
     assert out.loc["AAA", "composite_rank"] == 1
+
+
+# ---- TradingView overlay (NON-PRIMARY context; must never touch the score) ----
+
+def _fake_tv_df():
+    # Only AAA is in the screen result; BBB is absent (i.e. fails the screen).
+    return pd.DataFrame({
+        "ticker": ["AAA"],
+        "RSI": [55.0],
+        "close": [10.0],
+        "passes_screen": [True],
+        "asof": ["2026-05-30T00:00:00+00:00"],
+        "source": [SOURCE_TAG],
+    })
+
+
+def test_overlay_does_not_change_composite(patched_adapters: Path, monkeypatch):
+    monkeypatch.setattr(
+        TradingViewProvider, "get_screen", lambda self, refresh=False: _fake_tv_df()
+    )
+    base = run_screener(
+        tickers=["AAA", "BBB"], skip_market_cap=True,
+        output_path=patched_adapters / "base.xlsx",
+    )
+    over = run_screener(
+        tickers=["AAA", "BBB"], skip_market_cap=True,
+        output_path=patched_adapters / "over.xlsx", tv_overlay=True,
+    )
+    # The pure fundamental engine is byte-identical with vs without the overlay.
+    for col in ["composite_score", "composite_rank",
+                "q1_quality_score", "q2_valuation_score", "q3_improving_score"]:
+        pd.testing.assert_series_equal(
+            base[col].sort_index(), over[col].sort_index(), check_names=False
+        )
+    # Overlay columns appear only in the overlaid run.
+    assert "passes_screen" in over.columns and "passes_screen" not in base.columns
+    assert bool(over.loc["AAA", "passes_screen"]) is True
+    assert bool(over.loc["BBB", "passes_screen"]) is False
+    # Carried indicator present for the passer, blank for the non-passer.
+    assert over.loc["AAA", "tv_RSI"] == 55.0
+    assert pd.isna(over.loc["BBB", "tv_RSI"])
+    # Source tag appended for the passer only.
+    assert SOURCE_TAG in over.loc["AAA", "sources"]
+    assert SOURCE_TAG not in (over.loc["BBB", "sources"] or "")
+
+
+def test_overlay_columns_are_in_tail(patched_adapters: Path, monkeypatch):
+    monkeypatch.setattr(
+        TradingViewProvider, "get_screen", lambda self, refresh=False: _fake_tv_df()
+    )
+    out = run_screener(
+        tickers=["AAA", "BBB"], skip_market_cap=True,
+        output_path=patched_adapters / "tail.xlsx", tv_overlay=True,
+    )
+    cols = list(out.columns)
+    ns = cols.index("ns_flags")  # downside flags stay left of every overlay col
+    for c in ["passes_screen", "tv_divergence", "tv_RSI", "tv_asof"]:
+        assert cols.index(c) > ns
+
+
+def test_overlay_resilient_on_tv_failure(patched_adapters: Path, monkeypatch):
+    def _boom(self, refresh=False):
+        raise RuntimeError("tradingview endpoint down")
+
+    monkeypatch.setattr(TradingViewProvider, "get_screen", _boom)
+    out = run_screener(
+        tickers=["AAA", "BBB"], skip_market_cap=True,
+        output_path=patched_adapters / "fail.xlsx", tv_overlay=True,
+    )
+    # Full fundamental output survives; the overlay columns are simply absent.
+    assert out.loc["AAA", "composite_rank"] == 1
+    assert pd.notna(out.loc["AAA", "q1_quality_score"])
+    assert "passes_screen" not in out.columns
+
+
+def test_divergence_buckets():
+    composite = pd.Series({"A": 90.0, "B": 80.0, "C": 20.0, "D": 10.0,
+                           "E": float("nan"), "F": 50.0})
+    passes = pd.Series({"A": True, "B": False, "C": True, "D": False,
+                        "E": False, "F": True})
+    has_tv = pd.Series({"A": True, "B": True, "C": True, "D": True,
+                        "E": True, "F": False})
+    out = _tv_divergence(composite, passes, has_tv, strong_pctile=0.6)
+    assert out["A"] == "agree_strong"                      # strong + pass
+    assert out["B"] == "diverge_fund_strong_tech_fail"     # strong + fail
+    assert out["C"] == "diverge_fund_weak_tech_pass"       # weak + pass
+    assert out["D"] == "agree_weak"                        # weak + fail
+    assert out["E"] == "n/a"                               # NaN composite
+    assert out["F"] == "no_tv"                             # membership unknown

@@ -14,6 +14,7 @@ left blank and the ticker is still included with quality + improving scores.
 
 from __future__ import annotations
 
+import sys
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Iterable
@@ -222,6 +223,81 @@ def _candidate_tickers(
     ]
 
 
+# Identifier columns from the scanner that are NOT technical indicators.
+_TV_IDENT = {"name", "description", "ticker", "exchange", "type", "subtype",
+             "passes_screen", "asof", "source"}
+
+
+def _tv_divergence(
+    composite: pd.Series,
+    passes: pd.Series,
+    has_tv: pd.Series,
+    strong_pctile: float,
+) -> pd.Series:
+    """Neutral fundamentals-vs-technicals divergence label.
+
+    Derived from the PURE composite score (it never feeds back into it). `has_tv`
+    marks rows whose screen membership is known; rows without it get 'no_tv' so a
+    failed/partial pull never reads as agreement. NaN composite -> 'n/a'.
+    """
+    composite = composite.astype(float)
+    strong = composite.rank(pct=True) >= strong_pctile
+    p = passes.reindex(composite.index).fillna(False).astype(bool)
+    htv = has_tv.reindex(composite.index).fillna(False).astype(bool)
+    res = pd.Series("n/a", index=composite.index, dtype=object)
+    res[~htv] = "no_tv"
+    valid = htv & composite.notna()
+    res[htv & composite.isna()] = "n/a"
+    res[valid & p & strong] = "agree_strong"
+    res[valid & ~p & ~strong] = "agree_weak"
+    res[valid & ~p & strong] = "diverge_fund_strong_tech_fail"
+    res[valid & p & ~strong] = "diverge_fund_weak_tech_pass"
+    return res
+
+
+def _apply_tv_overlay(out: pd.DataFrame, tv_df: pd.DataFrame, tv_cfg) -> pd.DataFrame:
+    """Splice the NON-PRIMARY TradingView screen membership + carried indicators
+    onto the already-scored frame and add a derived `tv_divergence`.
+
+    Never touches the composite, sub-scores, or rank (CLAUDE.md: bottom-up,
+    downside-first). Carried indicators are prefixed `tv_` so provenance is
+    obvious and nothing collides with a fundamental column.
+    """
+    from ..adapters.tradingview import SOURCE_TAG
+
+    out = out.copy()
+    tv = tv_df.copy()
+    if "ticker" in tv.columns:
+        tv = tv.set_index(tv["ticker"].astype(str).str.upper())
+    tv = tv[~tv.index.duplicated(keep="first")]
+
+    passing = set(tv.index)
+    passes = pd.Series([t in passing for t in out.index], index=out.index)
+    out["passes_screen"] = passes
+
+    ident = _TV_IDENT
+    for c in [c for c in tv.columns if c not in ident]:
+        out[f"tv_{c}"] = tv[c].reindex(out.index)
+
+    out["tv_asof"] = str(tv["asof"].iloc[0]) if ("asof" in tv.columns and len(tv)) else None
+
+    # Tag `sources` for rows that actually received TradingView data (passers).
+    def _append_src(cur: object) -> str:
+        cur = "" if cur is None or (isinstance(cur, float) and pd.isna(cur)) else str(cur)
+        return f"{cur}, {SOURCE_TAG}" if cur else SOURCE_TAG
+    if "sources" in out.columns:
+        out.loc[passes, "sources"] = out.loc[passes, "sources"].apply(_append_src)
+
+    # Once the pull succeeds, membership is known for every row (absence from the
+    # screen == fail), so divergence resolves to the four neutral buckets.
+    out["tv_divergence"] = _tv_divergence(
+        out["composite_score"], passes,
+        pd.Series(True, index=out.index),
+        float(tv_cfg.divergence_strong_pctile),
+    )
+    return out
+
+
 def run_screener(
     tickers: Iterable[str] | None = None,
     sector: str | None = None,
@@ -229,6 +305,8 @@ def run_screener(
     output_path: Path | str | None = None,
     skip_market_cap: bool = False,
     hard_exclude_neg_space: bool = False,
+    tv_overlay: bool = False,
+    refresh_tv: bool = False,
 ) -> pd.DataFrame:
     """Run the three-attribute screen and write screener_output.xlsx.
 
@@ -312,7 +390,22 @@ def run_screener(
         out["composite_rank"] = range(1, len(out) + 1)
         out.loc[out["composite_score"].isna(), "composite_rank"] = np.nan
 
-    # Reorder columns: identity, sub-scores prominent, then components, then sources.
+    # ---- TradingView technical overlay (NON-PRIMARY context) ----
+    # Quarantined per CLAUDE.md (bottom-up only): spliced in AFTER the composite
+    # and rank are final, so it is structurally unable to reach score_universe.
+    # Any failure degrades to full fundamental output with the TA columns absent.
+    cfg = load_config()
+    if tv_overlay and cfg.tradingview.enabled:
+        try:
+            from ..adapters.tradingview import TradingViewProvider
+            tv_df = TradingViewProvider().get_screen(refresh=refresh_tv)
+            out = _apply_tv_overlay(out, tv_df, cfg.tradingview)
+        except Exception as exc:  # noqa: BLE001 — overlay must never break the screen
+            print(f"[tv-overlay] skipped: {exc}", file=sys.stderr)
+
+    # Reorder columns: identity, sub-scores prominent, then components and
+    # sources, and finally the NON-PRIMARY TradingView overlay columns — kept to
+    # the RIGHT of the downside flags so margin-of-safety stays most prominent.
     front = [
         "name", "gics_sector", "is_bank", "market_cap",
         "composite_rank", "composite_score",
@@ -320,8 +413,13 @@ def run_screener(
         "negative_space", "ns_flags",
     ]
     front = [c for c in front if c in out.columns]
-    rest = [c for c in out.columns if c not in front]
-    out = out[front + rest]
+    tv_order = ["passes_screen", "tv_divergence"]
+    tv_indicators = sorted(
+        c for c in out.columns if c.startswith("tv_") and c not in ("tv_divergence", "tv_asof")
+    )
+    tv_tail = [c for c in (tv_order + tv_indicators + ["tv_asof"]) if c in out.columns]
+    rest = [c for c in out.columns if c not in front and c not in tv_tail]
+    out = out[front + rest + tv_tail]
 
     output_path = Path(output_path) if output_path else (cache_dir() / "screener_output.xlsx")
     _write_screener_xlsx(out, output_path)

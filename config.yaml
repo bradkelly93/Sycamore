@@ -35,3 +35,27 @@ peers:
 
 # Test tickers used in Phase 1 acceptance.
 test_tickers: ["CW", "WES", "UMBF", "LECO", "MTDR"]
+
+# TradingView technical-screen overlay (NON-PRIMARY context; never enters the
+# three-attribute score). Transcribe your OWN saved screen's conditions below.
+# Surfaced by `screen --tv-overlay` as extra columns to the RIGHT of the
+# downside flags. See README "TradingView technical overlay".
+tradingview:
+  enabled: true
+  region: america
+  # Indicator columns carried into the xlsx (prefixed `tv_`).
+  select: ["close", "RSI", "SMA200", "volume", "market_cap_basic"]
+  # Declarative replica of your saved screen. AND-combined. {field, op, value}.
+  # op in: gt, lt, ge, le, eq, between, isin, above, below, crosses_above,
+  # crosses_below. For above/below/crosses_*, value is ANOTHER FIELD NAME
+  # (field-vs-field); otherwise value is a literal.
+  filters:
+    - {field: market_cap_basic, op: between, value: [300000000, 10000000000]}
+    - {field: close, op: above, value: SMA200}     # price above its 200-day SMA
+    - {field: RSI, op: lt, value: 70}
+    - {field: volume, op: gt, value: 500000}
+  cache_ttl_minutes: 1440      # reuse the cached snapshot within this window
+  max_results: 20000
+  divergence_strong_pctile: 0.70   # "strong fundamentals" cut on the PURE composite
+  # sessionid: null            # realtime needs your own TradingView sessionid;
+  #                            # or export TV_SESSIONID so no secret is committed.
