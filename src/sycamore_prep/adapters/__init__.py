@@ -1,14 +1,25 @@
 """Data adapter layer. Downstream code must depend only on `base` interfaces."""
 
-from .base import FundamentalsProvider, PriceProvider, FilingsProvider, FinancialsFrame
+from .base import (
+    FundamentalsProvider,
+    PriceProvider,
+    FilingsProvider,
+    VolatilityProvider,
+    FinancialsFrame,
+    VolatilityFrame,
+)
 from .edgar import EdgarProvider
 from .yfinance_provider import YFinanceProvider
+from .tastytrade_provider import TastytradeProvider
 
 __all__ = [
     "FundamentalsProvider",
     "PriceProvider",
     "FilingsProvider",
+    "VolatilityProvider",
     "FinancialsFrame",
+    "VolatilityFrame",
     "EdgarProvider",
     "YFinanceProvider",
+    "TastytradeProvider",
 ]

@@ -46,12 +46,27 @@ class ValuationConfig(BaseModel):
     forecast_years: int = 10
 
 
+class TastytradeConfig(BaseModel):
+    """Non-secret settings for the volatility overlay.
+
+    Credentials are NEVER stored here (config.yaml is committed) — set
+    TASTYTRADE_CLIENT_SECRET / TASTYTRADE_REFRESH_TOKEN in the environment
+    (OAuth2; username/password session-tokens were discontinued 2025-12-01).
+    """
+
+    base_url: str = "https://api.tastyworks.com"
+    user_agent: str = "sycamore-prep/0.1 (volatility-overlay)"
+    api_version: str = "20251101"
+    horizon_days: int = 30
+
+
 class AppConfig(BaseModel):
     edgar: EdgarConfig
     cache: CacheConfig = Field(default_factory=CacheConfig)
     raw: RawConfig = Field(default_factory=RawConfig)
     valuation: ValuationConfig = Field(default_factory=ValuationConfig)
     spinoffs: SpinoffsConfig = Field(default_factory=SpinoffsConfig)
+    tastytrade: TastytradeConfig = Field(default_factory=TastytradeConfig)
     peers: dict[str, list[str]] = Field(default_factory=dict)
     test_tickers: list[str] = Field(default_factory=list)
 

@@ -106,3 +106,34 @@ def load_text(key: str) -> str | None:
     if not p.exists():
         return None
     return p.read_text(encoding="utf-8")
+
+
+# --------------------------------------------------------------------------- #
+# Volatility snapshots (tastytrade overlay) — rolling daily history
+# --------------------------------------------------------------------------- #
+
+def volatility_path(ticker: str) -> Path:
+    return cache_dir() / f"volatility_{ticker.upper()}.parquet"
+
+
+def load_volatility(ticker: str) -> pd.DataFrame | None:
+    p = volatility_path(ticker)
+    if not p.exists():
+        return None
+    return pd.read_parquet(p)
+
+
+def save_volatility(ticker: str, df: pd.DataFrame) -> Path:
+    """Append today's snapshot, replacing any same-`as_of` rows for the ticker.
+
+    Keeps a rolling history of daily vol observations (vol is time-sensitive,
+    unlike a fiscal period) without duplicating a re-pull on the same day.
+    """
+    p = volatility_path(ticker)
+    if p.exists() and not df.empty and "as_of" in df.columns:
+        prev = pd.read_parquet(p)
+        if "as_of" in prev.columns:
+            prev = prev[~prev["as_of"].isin(df["as_of"].unique())]
+            df = pd.concat([prev, df], ignore_index=True)
+    df.to_parquet(p, index=False)
+    return p

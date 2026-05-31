@@ -1,0 +1,29 @@
+{
+  "data": {
+    "items": [
+      {
+        "underlying-symbol": "CW",
+        "root-symbol": "CW",
+        "expirations": [
+          {
+            "expiration-date": "2026-06-19",
+            "days-to-expiration": 20,
+            "strikes": [
+              {"strike-price": "95.0", "call": "CW    260619C00095000", "put": "CW    260619P00095000", "call-streamer-symbol": ".CW260619C95", "put-streamer-symbol": ".CW260619P95"},
+              {"strike-price": "100.0", "call": "CW    260619C00100000", "put": "CW    260619P00100000", "call-streamer-symbol": ".CW260619C100", "put-streamer-symbol": ".CW260619P100"}
+            ]
+          },
+          {
+            "expiration-date": "2026-08-21",
+            "days-to-expiration": 83,
+            "strikes": [
+              {"strike-price": "90.0", "call": "CW    260821C00090000", "put": "CW    260821P00090000", "call-streamer-symbol": ".CW260821C90", "put-streamer-symbol": ".CW260821P90"},
+              {"strike-price": "100.0", "call": "CW    260821C00100000", "put": "CW    260821P00100000", "call-streamer-symbol": ".CW260821C100", "put-streamer-symbol": ".CW260821P100"},
+              {"strike-price": "110.0", "call": "CW    260821C00110000", "put": "CW    260821P00110000", "call-streamer-symbol": ".CW260821C110", "put-streamer-symbol": ".CW260821P110"}
+            ]
+          }
+        ]
+      }
+    ]
+  }
+}

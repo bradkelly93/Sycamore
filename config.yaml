@@ -37,6 +37,20 @@ spinoffs:
   # full-text-search query so a forms-only scan still returns hits.
   query: "information statement"
 
+# Volatility overlay (tastytrade). DOWNSIDE CROSS-CHECK ONLY — reads
+# market-level IV metrics for names under research; never positions, never
+# orders. Auth is OAuth2 (username/password session-tokens were discontinued
+# 2025-12-01). Credentials are NOT stored here (this file is committed) — set
+# them in the environment after creating an OAuth app + personal grant:
+#   export TASTYTRADE_CLIENT_SECRET=...
+#   export TASTYTRADE_REFRESH_TOKEN=...
+tastytrade:
+  base_url: "https://api.tastyworks.com"
+  user_agent: "sycamore-prep/0.1 (volatility-overlay)"
+  api_version: "20251101"
+  # Default expected-move horizon in calendar days.
+  horizon_days: 30
+
 # Peer maps for comps. Override per-run via CLI --peers.
 peers:
   CW:  ["HEI", "TDG", "MOG.A", "KTOS", "CACI"]
