@@ -54,7 +54,11 @@ def _cagr(s: pd.Series, n: int) -> float:
     if n < 1 or len(s) < n + 1:
         return float("nan")
     a, b = float(s.iloc[-(n + 1)]), float(s.iloc[-1])
-    if a <= 0 or a != a or b != b:
+    # CAGR is only defined for two positive endpoints. A non-positive start OR
+    # end (FCF can end in a down/loss year) makes the fractional power undefined
+    # in the reals -> NaN + a "scalar power" RuntimeWarning. Guard both ends so
+    # g_hist falls back cleanly (the DCF then floors assumed_growth at terminal).
+    if a != a or b != b or a <= 0 or b <= 0:
         return float("nan")
     return (b / a) ** (1.0 / n) - 1.0
 

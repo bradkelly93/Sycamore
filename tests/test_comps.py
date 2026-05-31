@@ -10,6 +10,7 @@ import numpy as np
 import pandas as pd
 import pytest
 
+from sycamore_prep.comps.comps import _cagr
 from sycamore_prep.adapters.base import FinancialsFrame
 from sycamore_prep.comps.history import (
     align_prices_to_fy_ends,
@@ -27,6 +28,27 @@ def _ff(rows: list[dict]) -> FinancialsFrame:
 
 def _prices(rows: list[tuple[str, float]]) -> pd.DataFrame:
     return pd.DataFrame({"date": [r[0] for r in rows], "close": [r[1] for r in rows]})
+
+
+# --------------------------------------------------------------------------- #
+# _cagr (feeds the DCF's assumed_growth via g_hist)
+# --------------------------------------------------------------------------- #
+
+def test_comps_cagr_happy_path():
+    assert _cagr(pd.Series([100.0, 110.0, 121.0, 133.1]), 3) == pytest.approx(0.10, abs=1e-9)
+
+
+def test_comps_cagr_nan_on_nonpositive_endpoints_without_warning():
+    """FCF can end in a negative year; the fractional power is then undefined.
+    _cagr must return NaN cleanly with NO 'scalar power' RuntimeWarning (it runs
+    across every name in a comps/pipeline sweep)."""
+    import warnings
+
+    with warnings.catch_warnings():
+        warnings.simplefilter("error")
+        assert math.isnan(_cagr(pd.Series([-5.0, 1.0, 2.0, 4.0]), 3))   # negative start
+        assert math.isnan(_cagr(pd.Series([5.0, 4.0, 2.0, -1.0]), 3))   # negative end (the gap)
+        assert math.isnan(_cagr(pd.Series([100.0, 110.0]), 3))          # too short
 
 
 # --------------------------------------------------------------------------- #

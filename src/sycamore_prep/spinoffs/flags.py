@@ -50,7 +50,10 @@ def _cagr(series: pd.Series, years: int) -> float | None:
     if len(s) < years + 1:
         return None
     start, end = s.iloc[-(years + 1)], s.iloc[-1]
-    if pd.isna(start) or pd.isna(end) or start <= 0:
+    # CAGR needs two positive endpoints; guard a non-positive END too (not just
+    # start) so a swing into a negative year returns None cleanly rather than a
+    # NaN + a "scalar power" RuntimeWarning.
+    if pd.isna(start) or pd.isna(end) or start <= 0 or end <= 0:
         return None
     return float((end / start) ** (1.0 / years) - 1.0)
 

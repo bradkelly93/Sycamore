@@ -22,10 +22,24 @@ from sycamore_prep.spinoffs.discovery import (
     _record_from_submissions,
     status_from_submissions,
 )
+from sycamore_prep.spinoffs.flags import _cagr
 from sycamore_prep.spinoffs.report import records_to_df, write_tracker_md, write_tracker_xlsx
 from sycamore_prep.spinoffs.tracker import run_track
 
 FIXTURE_DIR = Path(__file__).parent / "fixtures"
+
+
+def test_flags_cagr_none_on_nonpositive_endpoints_without_warning():
+    """spinoffs revenue/FCF CAGR: guard both endpoints; return None cleanly with
+    no 'scalar power' RuntimeWarning when an endpoint is non-positive."""
+    import warnings
+
+    assert _cagr(pd.Series([100.0, 110.0, 121.0, 133.1]), 3) == pytest.approx(0.10, abs=1e-9)
+    with warnings.catch_warnings():
+        warnings.simplefilter("error")
+        assert _cagr(pd.Series([-5.0, 1.0, 2.0, 4.0]), 3) is None   # negative start
+        assert _cagr(pd.Series([5.0, 4.0, 2.0, -1.0]), 3) is None   # negative end (the gap)
+        assert _cagr(pd.Series([100.0, 110.0]), 3) is None          # too short
 
 
 def _load(name: str) -> dict:
