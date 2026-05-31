@@ -265,3 +265,78 @@ def test_divergence_buckets():
     assert out["D"] == "agree_weak"                        # weak + fail
     assert out["E"] == "n/a"                               # NaN composite
     assert out["F"] == "no_tv"                             # membership unknown
+
+
+# ---- Merge-correctness: the three NON-PRIMARY overlays are structurally walled
+# off from the three-attribute score / composite / rank (CLAUDE.md). ----
+
+def test_score_universe_ignores_overlay_columns():
+    """score_universe must read ONLY the named fundamental components. Inject
+    vol + TradingView + prediction overlay columns whose values would flip the
+    ranking IF they leaked in, and assert every score/rank is byte-identical."""
+    base = pd.DataFrame({
+        "roic": [0.20, 0.05, 0.10],
+        "fcf_margin": [0.15, 0.02, 0.08],
+        "pe": [12.0, 25.0, 18.0],
+        "fcf_yield": [0.08, 0.02, 0.05],
+        "rev_3yr_cagr": [0.10, 0.00, 0.05],
+    }, index=["A", "B", "C"])
+    polluted = base.copy()
+    # Volatility overlay (annotated onto rows BEFORE scoring) ...
+    polluted["iv_rank"] = [0.99, 0.01, 0.50]
+    polluted["iv_percentile"] = [0.95, 0.05, 0.50]
+    polluted["vol_beta"] = [3.0, 0.1, 1.0]
+    polluted["liquidity_rating"] = [1.0, 4.0, 2.0]
+    # ... TradingView overlay (spliced AFTER rank) ...
+    polluted["passes_screen"] = [False, True, True]
+    polluted["tv_RSI"] = [10.0, 90.0, 50.0]
+    polluted["tv_divergence"] = ["x", "y", "z"]
+    # ... prediction overlay (spliced AFTER rank).
+    polluted["event_top_prob"] = [0.90, 0.00, 0.40]
+    polluted["event_contradiction"] = [True, False, False]
+
+    a = score_universe(base).df
+    b = score_universe(polluted).df
+    for col in ["q1_quality_score", "q2_valuation_score", "q3_improving_score",
+                "composite_score", "composite_rank"]:
+        pd.testing.assert_series_equal(a[col], b[col], check_names=False)
+
+
+def test_all_overlays_off_vs_on_identical_composite_rank(patched_adapters, monkeypatch):
+    """End-to-end: running the screener with all three overlay flags OFF vs ON
+    yields IDENTICAL composite_rank (and sub-scores) for every name. The overlays
+    splice columns but can never reach score_universe / composite / rank."""
+    # TradingView is stubbed so the overlay genuinely splices columns (proving
+    # the post-rank splice path runs). Vol + prediction run with their flags on
+    # but degrade offline (no creds / empty mapping); the invariant holds either
+    # way. Pin the prediction mapping to a non-existent path so the run is
+    # hermetic + offline regardless of any local data/raw/ contents.
+    monkeypatch.setattr(screen_mod, "_tv_provider",
+                        lambda mode: _StubProvider(_fake_tv_df()))
+    monkeypatch.setattr(
+        "sycamore_prep.prediction_markets.mapping.mapping_csv_path",
+        lambda: patched_adapters / "no_such_mapping.csv",
+    )
+    off = run_screener(
+        tickers=["AAA", "BBB"], skip_market_cap=True,
+        output_path=patched_adapters / "off.xlsx",
+    )
+    on = run_screener(
+        tickers=["AAA", "BBB"], skip_market_cap=True,
+        output_path=patched_adapters / "on.xlsx",
+        with_vol=True, tv_overlay=True, with_prediction_overlay=True,
+    )
+    for col in ["composite_rank", "composite_score",
+                "q1_quality_score", "q2_valuation_score", "q3_improving_score"]:
+        pd.testing.assert_series_equal(
+            off[col].sort_index(), on[col].sort_index(), check_names=False
+        )
+    # Not vacuous: the overlaid run actually gained overlay columns (TradingView
+    # membership + prediction event columns), yet rank stayed identical ...
+    assert "passes_screen" in on.columns and "passes_screen" not in off.columns
+    assert "event_top_prob" in on.columns
+    # ... and every overlay column stays to the RIGHT of the downside flags.
+    cols = list(on.columns)
+    ns = cols.index("ns_flags")
+    assert cols.index("passes_screen") > ns
+    assert cols.index("event_top_prob") > ns

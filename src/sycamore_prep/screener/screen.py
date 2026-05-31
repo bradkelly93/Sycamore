@@ -26,8 +26,6 @@ from ..adapters import EdgarProvider, YFinanceProvider
 from ..adapters.base import FinancialsFrame
 from ..config import cache_dir, load_config
 from ..metrics import (
-    allowance_to_loans_fy,
-    ebitda_fy,
     fcf_margin_fy,
     fcf_yield_fy,
     free_cash_flow_fy,
@@ -36,18 +34,14 @@ from ..metrics import (
     interest_coverage_fy,
     is_bank,
     net_debt_to_ebitda_fy,
-    net_interest_margin_fy,
     p_tbv_fy,
     pe_fy,
     percentile_vs_history,
     revenue_fy,
     roic_fy,
-    roe_fy,
     rotce_fy,
-    tangible_book_value_fy,
     ev_ebitda_fy,
 )
-from ..metrics.cashflow import fcf_conversion_fy
 from ..metrics.profitability import _series, net_income_fy
 from ..universe.builder import load_universe
 from .scoring import score_universe
