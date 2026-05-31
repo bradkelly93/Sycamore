@@ -35,3 +35,35 @@ peers:
 
 # Test tickers used in Phase 1 acceptance.
 test_tickers: ["CW", "WES", "UMBF", "LECO", "MTDR"]
+
+# Technical overlay (NON-PRIMARY context; never enters the three-attribute
+# score). Surfaced by `screen --tv-overlay` as extra columns to the RIGHT of the
+# downside flags. See README "TradingView technical overlay". mode selects source:
+#   trend -> transparent Bull/Neutral/Bear regime computed in Python from the
+#            prices we already pull (no TradingView account; fully auditable).
+#   csv   -> read data/raw/<csv_file> (e.g. a custom Pine indicator's tickers).
+#   api   -> replicate a built-in TradingView Stock Screener live (RSI/SMA/...).
+tradingview:
+  enabled: true
+  mode: trend
+  divergence_strong_pctile: 0.70     # "strong fundamentals" cut on the PURE composite
+  pass_values: ["Bull"]              # regime/label values that count as a "pass"
+
+  # --- mode: csv ---
+  csv_file: trend_chameleon.csv      # drop in data/raw/ ; needs a `ticker` column
+  signal_column: ""                  # e.g. "regime" — derive pass from this label column
+
+  # --- mode: api (built-in Stock Screener) ---
+  # Declarative replica. AND-combined. {field, op, value}. op in: gt, lt, ge, le,
+  # eq, between, isin, above, below, crosses_above, crosses_below. For
+  # above/below/crosses_*, value is ANOTHER FIELD NAME.
+  region: america
+  select: ["close", "RSI", "SMA200", "volume", "market_cap_basic"]
+  filters:
+    - {field: market_cap_basic, op: between, value: [300000000, 10000000000]}
+    - {field: close, op: above, value: SMA200}
+    - {field: RSI, op: lt, value: 70}
+    - {field: volume, op: gt, value: 500000}
+  cache_ttl_minutes: 1440
+  max_results: 20000
+  # sessionid: null    # realtime needs your own TradingView sessionid (or TV_SESSIONID)
