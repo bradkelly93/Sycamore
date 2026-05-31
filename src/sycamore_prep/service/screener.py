@@ -126,15 +126,20 @@ def _to_view(df: pd.DataFrame, *, tickers, sector, limit,
 def run(tickers=None, sector=None, limit=None, *, with_vol=False, tv_overlay=False,
         with_prediction_overlay=False, hard_exclude_neg_space=False,
         skip_market_cap=False, refresh_tv=False) -> ScreenerView:
+    out_path = cache_dir() / "screener_output.xlsx"
     df = run_screener(
-        tickers=tickers, sector=sector, limit=limit,
+        tickers=tickers, sector=sector, limit=limit, output_path=out_path,
         skip_market_cap=skip_market_cap, hard_exclude_neg_space=hard_exclude_neg_space,
         with_vol=with_vol, tv_overlay=tv_overlay, refresh_tv=refresh_tv,
         with_prediction_overlay=with_prediction_overlay,
     )
-    return _to_view(df, tickers=tickers, sector=sector, limit=limit,
+    view = _to_view(df, tickers=tickers, sector=sector, limit=limit,
                     with_vol=with_vol, tv_overlay=tv_overlay,
                     with_prediction_overlay=with_prediction_overlay)
+    if out_path.exists():   # full ranked xlsx is downloadable (auditability §3.6)
+        from . import artifacts
+        view.screener_artifact = artifacts.register(out_path, "xlsx")
+    return view
 
 
 def verify_rank_unchanged(tickers=None, sector=None, limit=None, *,

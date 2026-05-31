@@ -160,6 +160,7 @@ class ScreenerView(BaseModel):
     rank_unchanged: RankUnchangedClaim = Field(default_factory=RankUnchangedClaim)
     notes: dict[str, str | None] = Field(default_factory=dict)
     source_summary: list[str] = Field(default_factory=list)
+    screener_artifact: ArtifactRef | None = None   # full ranked xlsx (auditable download)
 
 
 class RankProof(BaseModel):
@@ -317,6 +318,14 @@ class UniverseView(BaseModel):
     sycamore_owned: int = 0
     instructions: str | None = None
     csv_artifact: ArtifactRef | None = None
+
+
+class SpinoffsView(BaseModel):
+    """Read-only in Phase A: cached scan/track artifacts as downloads. Live
+    scan/track (a network action) is wired in Phase B."""
+
+    artifacts: list[ArtifactRef] = Field(default_factory=list)
+    note: str | None = None
 
 
 class CredsStatus(BaseModel):

@@ -19,6 +19,7 @@ from . import (
     prediction,
     screener,
     serde,
+    spinoffs,
     universe,
     workup,
 )
@@ -41,6 +42,7 @@ from .viewmodels import (
     RankUnchangedClaim,
     ScreenerRowView,
     ScreenerView,
+    SpinoffsView,
     UniverseView,
     VolPanelView,
     fig,
@@ -49,11 +51,11 @@ from .viewmodels import (
 __all__ = [
     # submodules (facades)
     "artifacts", "creds", "jobs", "overlays", "pipeline", "prediction",
-    "screener", "serde", "universe", "workup",
+    "screener", "serde", "spinoffs", "universe", "workup",
     # view-models
     "ArtifactRef", "BandView", "CredsStatus", "DcfCaseView", "DossierView",
     "Figure", "JobView", "MappingRowView", "MappingView", "NameWorkupView",
     "NormalizedView", "OverlayView", "PipelineRunRef", "PipelineView", "RankProof",
-    "RankUnchangedClaim", "ScreenerRowView", "ScreenerView", "UniverseView",
-    "VolPanelView", "fig",
+    "RankUnchangedClaim", "ScreenerRowView", "ScreenerView", "SpinoffsView",
+    "UniverseView", "VolPanelView", "fig",
 ]
