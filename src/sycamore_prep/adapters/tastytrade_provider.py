@@ -133,6 +133,7 @@ class TastytradeProvider(VolatilityProvider):
         self,
         client_secret: str | None = None,
         refresh_token: str | None = None,
+        client_id: str | None = None,
         base_url: str | None = None,
         user_agent: str | None = None,
         api_version: str | None = None,
@@ -148,6 +149,9 @@ class TastytradeProvider(VolatilityProvider):
         )
         self._refresh_token = (
             refresh_token or os.environ.get("TASTYTRADE_REFRESH_TOKEN") or os.environ.get("TT_REFRESH")
+        )
+        self._client_id = (
+            client_id or os.environ.get("TASTYTRADE_CLIENT_ID") or os.environ.get("TT_CLIENT_ID")
         )
         self._max_retries = max(1, max_retries)
         self._session = session
@@ -187,6 +191,20 @@ class TastytradeProvider(VolatilityProvider):
         resp.raise_for_status()
         return resp.json()
 
+    def _post_form(self, path: str, data: dict) -> dict:
+        """POST application/x-www-form-urlencoded. OAuth2 token endpoints expect
+        form encoding (not JSON), so the /oauth/token call uses this."""
+        headers = {
+            "User-Agent": self.user_agent,
+            "Accept": "application/json",
+            "Content-Type": "application/x-www-form-urlencoded",
+        }
+        resp = self._client().post(
+            f"{self.base_url}{path}", data=data, headers=headers, timeout=30
+        )
+        resp.raise_for_status()
+        return resp.json()
+
     def _get(self, path: str, params: dict | None = None) -> dict:
         resp = self._client().get(
             f"{self.base_url}{path}", params=params, headers=self._headers(auth=True), timeout=30
@@ -202,14 +220,17 @@ class TastytradeProvider(VolatilityProvider):
                 "and TASTYTRADE_REFRESH_TOKEN in your environment (never config.yaml). "
                 "Create them under 'OAuth Applications' in your tastytrade account."
             )
-        payload = self._post(
-            "/oauth/token",
-            {
-                "grant_type": "refresh_token",
-                "client_secret": self._client_secret,
-                "refresh_token": self._refresh_token,
-            },
-        )
+        # tastytrade's OAuth2 refresh-token grant wants form-encoded fields and
+        # the client_id alongside the secret. (Sending JSON, or omitting
+        # client_id, returns 400 Bad Request from /oauth/token.)
+        form = {
+            "grant_type": "refresh_token",
+            "client_secret": self._client_secret,
+            "refresh_token": self._refresh_token,
+        }
+        if self._client_id:
+            form["client_id"] = self._client_id
+        payload = self._post_form("/oauth/token", form)
         token = (payload or {}).get("access_token")
         if not token:
             raise TastytradeError("tastytrade OAuth returned no access_token.")

@@ -171,21 +171,40 @@ def test_available_reads_env(monkeypatch):
 def test_oauth_login_builds_bearer_header(monkeypatch):
     calls = {}
 
-    def fake_post(self, path, json):  # noqa: ARG001
+    # The OAuth token call is form-encoded (not JSON) per OAuth2 — mock _post_form.
+    def fake_post_form(self, path, data):  # noqa: ARG001
         calls["path"] = path
-        calls["json"] = json
+        calls["data"] = data
         return {"access_token": "abc", "expires_in": 900}
 
-    monkeypatch.setattr(TastytradeProvider, "_post", fake_post)
-    prov = TastytradeProvider(client_secret="s", refresh_token="r", base_url="https://x")
+    monkeypatch.setattr(TastytradeProvider, "_post_form", fake_post_form)
+    prov = TastytradeProvider(
+        client_secret="s", refresh_token="r", client_id="cid", base_url="https://x"
+    )
 
     headers = prov._headers(auth=True)
     assert headers["Authorization"] == "Bearer abc"   # OAuth2 Bearer, not raw token
     assert headers["Accept-Version"]                  # version header sent
     assert calls["path"] == "/oauth/token"
-    assert calls["json"]["grant_type"] == "refresh_token"
-    assert calls["json"]["client_secret"] == "s"
-    assert calls["json"]["refresh_token"] == "r"
+    assert calls["data"]["grant_type"] == "refresh_token"
+    assert calls["data"]["client_secret"] == "s"
+    assert calls["data"]["refresh_token"] == "r"
+    assert calls["data"]["client_id"] == "cid"        # required by tastytrade's grant
+
+
+def test_oauth_login_omits_client_id_when_absent(monkeypatch):
+    """client_id is optional in the adapter (some setups don't need it); when
+    not provided it simply isn't sent rather than going through as None."""
+    calls = {}
+
+    def fake_post_form(self, path, data):  # noqa: ARG001
+        calls["data"] = data
+        return {"access_token": "abc", "expires_in": 900}
+
+    monkeypatch.setattr(TastytradeProvider, "_post_form", fake_post_form)
+    prov = TastytradeProvider(client_secret="s", refresh_token="r", base_url="https://x")
+    prov._login()
+    assert "client_id" not in calls["data"]
 
 
 # --------------------------------------------------------------------------
