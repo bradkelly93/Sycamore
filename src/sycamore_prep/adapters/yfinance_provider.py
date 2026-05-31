@@ -104,20 +104,31 @@ class YFinanceProvider(PriceProvider):
             pass
         return None
 
-    def get_sector(self, ticker: str) -> str | None:
+    def get_sector(self, ticker: str, use_cache: bool = True) -> str | None:
         """GICS sector for a ticker (NON-PRIMARY). Used by the prediction
         overlay to read a typed ticker through its sector-scoped macro markets.
         Normalizes yfinance's sector names to GICS so they match config's
-        `applies_to` / `sector_keywords`. Returns None if unavailable."""
-        yf = _yf()
+        `applies_to` / `sector_keywords`. Returns None if unavailable.
+
+        Successful lookups are cached to data/cache/ keyed by ticker so repeat
+        runs are instant and offline-replayable. Failed/empty lookups are NOT
+        cached, so a transient yfinance outage retries next run rather than
+        sticking a permanent miss."""
+        if use_cache:
+            cached = cache.load_sector(ticker)
+            if cached is not None:
+                return cached
         try:
+            yf = _yf()
             info = self._retry(lambda: yf.Ticker(ticker).get_info())
-        except Exception:  # noqa: BLE001
+        except Exception:  # noqa: BLE001 — incl. yfinance unimportable/offline
             return None
         sector = info.get("sector") if isinstance(info, dict) else None
         if not sector:
             return None
-        return _YF_TO_GICS_SECTOR.get(sector, sector)
+        gics = _YF_TO_GICS_SECTOR.get(sector, sector)
+        cache.save_sector(ticker, gics, source=SOURCE_TAG)
+        return gics
 
     def get_shares(self, ticker: str) -> float | None:
         yf = _yf()

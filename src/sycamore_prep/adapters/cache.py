@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import re
+from datetime import datetime, timezone
 from pathlib import Path
 
 import pandas as pd
@@ -29,6 +30,41 @@ def save_financials(ticker: str, df: pd.DataFrame) -> Path:
 
 def has_financials(ticker: str) -> bool:
     return _path(ticker).exists()
+
+
+def sector_path(ticker: str) -> Path:
+    return cache_dir() / f"sector_{ticker.upper()}.parquet"
+
+
+def load_sector(ticker: str) -> str | None:
+    """Cached GICS sector for a ticker, or None if not cached. Only successful
+    lookups are cached (see save_sector), so a miss means 'never resolved' —
+    distinct from a resolved-but-empty result."""
+    p = sector_path(ticker)
+    if not p.exists():
+        return None
+    try:
+        df = pd.read_parquet(p)
+    except Exception:  # noqa: BLE001 — corrupt/partial cache file; treat as miss
+        return None
+    if df.empty or "sector" not in df.columns:
+        return None
+    val = df.iloc[0]["sector"]
+    return str(val) if val is not None and str(val) != "" else None
+
+
+def save_sector(ticker: str, sector: str, source: str = "") -> Path:
+    """Cache a successfully-resolved GICS sector. Carries `source` + `as_of`
+    tags for auditability. Callers must NOT cache failed/empty lookups, so a
+    transient outage retries next run instead of sticking a permanent miss."""
+    p = sector_path(ticker)
+    pd.DataFrame([{
+        "ticker": ticker.upper(),
+        "sector": sector,
+        "source": source,
+        "as_of": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
+    }]).to_parquet(p, index=False)
+    return p
 
 
 def prices_path(ticker: str) -> Path:
