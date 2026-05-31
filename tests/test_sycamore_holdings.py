@@ -24,9 +24,10 @@ def test_load_holdings_both_funds_cash_dropped():
     assert counts.get("Established Value Fund") == 72
     assert counts.get("Small Company Opportunity Fund") == 104
     assert len(h) == 176
-    # Cash / non-equity rows dropped (no blank tickers, no cash sweep name).
+    # Cash / non-equity rows dropped (no blank tickers; the cash sweep is gone —
+    # but real holdings like "FirstCash Holdings" must NOT be dropped).
     assert (h["ticker"].str.len() > 0).all()
-    assert not h["name"].astype(str).str.contains("Cash", case=False).any()
+    assert "Cash & Liquidity Sweep" not in set(h["name"].astype(str))
     # Tickers normalized; known names present.
     assert "LH" in set(h["ticker"]) and "UBSI" in set(h["ticker"])
     assert h["ticker"].equals(h["ticker"].str.upper())
