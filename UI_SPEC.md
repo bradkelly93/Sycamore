@@ -10,15 +10,31 @@
 
 | Axis | Decision |
 |---|---|
-| **Shape** | **Hybrid** — an Explorer over the cache + pipeline runs, PLUS safe single-name triggers (comps / build-models / vol) and an inline prediction-mapping confirm table. Heavy jobs run in the background. |
-| **Stack** | **Streamlit** — pure Python over the existing engine functions; no JS, no second codebase. |
-| **Reach** | **Local, single-user** — `streamlit run`, localhost only. **No auth, no server, no DB.** Credentials via env vars (already how the CLI works). |
-| **Long jobs** | **Background task + live progress panel in the UI** (universe pull, full pipeline); UI stays responsive. Fast single-name actions run inline. |
+| **Reach** | **Local, single-user** — localhost only. **No auth, no server, no DB.** Credentials via env vars (already how the CLI works). |
+| **Long jobs** | **Background task + live progress panel** (universe pull, full pipeline); UI stays responsive. Fast single-name actions run inline. |
+| **Shape** | Evaluated as a **3-tier progression**, not three separate apps: Explorer ⊂ Hybrid ⊂ Full control panel. Built in phases A→B→C; owner judges at each tier. |
+| **Stack** | **Bake-off between Streamlit and FastAPI+web** (Textual TUI dropped). Decided by building one tier in both, then continuing the winner. |
 
-These came from an explicit owner decision that **lifts the CLAUDE.md "no web UI"
-non-goal**. The first build task is to update CLAUDE.md's non-goals + repo map to
-reflect that the UI is now in scope (a thin, local, read-mostly lens — still no
-auth/DB/hosting).
+### The build strategy (important — this is a stack bake-off, not 6 apps)
+
+The owner wants to choose from *working* prototypes rather than on paper. The
+cost-sane way to do that:
+
+1. **Phase A (Explorer, read-only) is built TWICE — once in Streamlit, once in
+   FastAPI + a light web frontend (HTMX or minimal React).** Same feature set,
+   same data, same design constraints (§3). This is the real, usable comparison.
+2. **Owner picks the stack** from the two Explorers.
+3. **The winning stack continues** through Phase B (Hybrid: single-name triggers
+   + prediction-mapping confirm) and Phase C (Full control panel: background
+   universe/pipeline jobs). The losing stack is dropped after Phase A.
+
+Net: **one genuine stack comparison + all three shapes seen**, without building
+3×2 = 6 apps. Keep the two Phase-A builds behind a shared, UI-agnostic service
+layer (§4a) so ~all the non-rendering code is reused across both and into B/C.
+
+This lifts the CLAUDE.md "no web UI" non-goal by explicit owner decision. **First
+build commit:** update CLAUDE.md's non-goals + repo map to reflect the UI is now
+in scope (a thin, local, read-mostly lens — still no auth/DB/hosting).
 
 ## 1. Guiding principle: the UI is a thin lens, not a second system
 
@@ -70,9 +86,48 @@ A slick UI is exactly how a disciplined tool becomes the opaque black box
 6. **Auditable** — every rendered number traceable to its engine output; offer
    "download the underlying xlsx/csv" on every view.
 
-## 4. Recommended layout (Streamlit, hybrid)
+## 4. Shared service layer (build FIRST — this is what makes the bake-off cheap)
 
-- **Sidebar:** global controls — ticker / peer-set / sector pickers, overlay
+The two Phase-A builds (Streamlit + FastAPI) must NOT each re-glue the engines.
+Build one **UI-agnostic service layer** that both front-ends import, so the only
+stack-specific code is rendering. This is also the seam that keeps the UI a thin
+lens (§1) and carries forward into Phase B/C and whichever stack wins.
+
+- **Location:** `src/sycamore_prep/service/` (a new package — pure Python, no UI
+  imports, no Streamlit/FastAPI deps). Unit-testable like any engine code.
+- **Responsibility:** call the engine entry points (§2), normalize their returns
+  into plain serializable view-models (dataclasses / dicts / DataFrames) that
+  already carry the §3 metadata — source tags, the three sub-scores kept
+  separate, downside fields flagged, overlay columns marked non-primary. A
+  front-end should be able to render purely from these without re-deriving
+  anything.
+- **Shape (illustrative, not prescriptive):**
+  - `service.screener.run(...) -> ScreenerView` (ranked rows + per-row source
+    tags + overlay-column provenance + a `rank_unchanged_by_overlays` checkable)
+  - `service.workup.for_ticker(ticker, ...) -> NameWorkupView` (comps + DCF
+    cases + normalized + model xlsx path + vol panel)
+  - `service.pipeline.latest() / .list_runs() / .load(run_dir) -> PipelineView`
+    (reads the `pipeline_<ts>/` folder: index, dossiers, manifest)
+  - `service.prediction.candidates(...)`, `.confirm(updates) -> MappingView`
+    (wraps `mapping.load_mapping/upsert/save_mapping` for the confirm table)
+  - `service.jobs` — a tiny background-job runner (thread/`concurrent.futures` +
+    a poll-able job-state object) used by Phase C; stack-agnostic.
+  - `service.creds.status() -> dict` (which env creds are detected; never values)
+- **Serializable by design:** because FastAPI will JSON these over HTTP and
+  Streamlit will render them in-process, the view-models must be JSON-friendly
+  (DataFrames → `to_dict`/records at the boundary). This constraint is free
+  insurance that the layer stays presentation-agnostic.
+
+**Both Phase-A Explorers are then ~just rendering** of identical service outputs
+— a fair stack comparison, and ~80% of the code is shared and survives the
+bake-off.
+
+## 5. UI layout (stack-agnostic; both Phase-A builds render these views)
+
+Described as pages/sections; Streamlit renders them as pages/tabs, FastAPI as
+routes + templates. Both pull from the §4 service layer.
+
+- **Sidebar / global controls:** ticker / peer-set / sector pickers, overlay
   toggles (`--vol`, `--tv-overlay`, `--with-prediction-overlay`), config status
   (peers, WACC/terminal-growth defaults, which creds are detected).
 - **Pages (or tabs):**
@@ -90,12 +145,13 @@ A slick UI is exactly how a disciplined tool becomes the opaque black box
   5. **Spin-offs** — scan / track views.
   6. **Overlays** — vol, technical, and the **prediction-mapping confirm table**
      (checkbox `confirmed` column writing back to `prediction_markets.csv` via
-     `mapping.upsert/save_mapping`) — the standout UI improvement over the CLI.
-- **Background jobs:** a simple thread/`concurrent.futures` runner + a status
-  panel (Streamlit reruns on interaction, so long jobs must not block the main
-  thread; poll a job-state object). Heavy = universe pull, full pipeline.
+     the service layer / `mapping.upsert/save_mapping`) — the standout UI
+     improvement over the CLI.
+- **Background jobs (Phase C):** via `service.jobs` — heavy = universe pull, full
+  pipeline. In Streamlit, long jobs must not block the rerun loop (poll the
+  job-state object); in FastAPI they're a natural async/background task.
 
-## 5. Cross-cutting concerns
+## 6. Cross-cutting concerns
 
 - **Creds:** read from env (same as CLI). Sidebar shows ✓/✗ for SEC user-agent,
   tastytrade (`CLIENT_ID`+`CLIENT_SECRET`+`REFRESH_TOKEN`, same app), TradingView
@@ -105,42 +161,56 @@ A slick UI is exactly how a disciplined tool becomes the opaque black box
   traceback). Prefer reading cache first; pull only on explicit action.
 - **Reproducibility:** show `manifest.json` (run params, cache timestamps, peers
   used, `peers_source`) on pipeline views so a run is auditable.
-- **Windows + venv:** the owner runs `.\.venv\Scripts\python.exe`. Provide a
-  `streamlit run` launch command (e.g. `.\.venv\Scripts\streamlit.exe run app.py`)
-  and add `streamlit` under an optional extra (e.g. `[ui]`) in `pyproject.toml`.
+- **Windows + venv:** the owner runs `.\.venv\Scripts\python.exe`. Each stack
+  gets its own optional extra in `pyproject.toml` (e.g. `[ui-streamlit]`,
+  `[ui-web]`) and a one-line launch command (Streamlit:
+  `.\.venv\Scripts\streamlit.exe run app_streamlit.py`; FastAPI:
+  `.\.venv\Scripts\uvicorn.exe sycamore_prep.web:app`). The service layer (§4)
+  needs no extra deps.
 
-## 6. Phased build plan (suggest to the build chat)
+## 7. Phased build plan (the bake-off)
 
-- **Phase A — Explorer (read-only, no jobs):** render existing cache + the latest
-  `pipeline_<ts>/` folder (index + dossiers), screener output, comps xlsx/md,
-  with all source-tag/downside/three-attribute rendering rules. Proves the lens
-  + the design constraints with zero job-management risk.
-- **Phase B — Safe single-name triggers:** comps / build-models / vol for one
-  ticker, inline with `st.status` progress. Add the prediction-mapping confirm
-  table (write-back).
-- **Phase C — Background heavy jobs:** universe build + full `run_pipeline` as
-  background tasks with a live progress panel.
+**Order is deliberate: shared service layer → two Explorers → pick → grow winner.**
 
-Ship A first; it's the most value for the least risk and locks the visual/ethos
-conventions before any concurrency.
+- **Phase 0 — Service layer (§4).** Build `src/sycamore_prep/service/` + its unit
+  tests first. No UI yet. This de-risks everything and is the shared substrate.
+- **Phase A — Explorer (read-only), built in BOTH stacks:**
+  - **A-Streamlit** and **A-FastAPI** — same views (§5), both rendering the §4
+    service outputs: existing cache + latest `pipeline_<ts>/` (index + dossiers),
+    screener output, comps xlsx/md — with all source-tag / downside-first /
+    three-attribute rules. No job management.
+  - **→ Owner compares the two and picks the stack.** Drop the loser.
+- **Phase B — Hybrid (winning stack only):** safe single-name triggers (comps /
+  build-models / vol for one ticker, inline progress) + the prediction-mapping
+  confirm table (write-back via the service layer).
+- **Phase C — Full control panel (winning stack only):** universe build + full
+  `run_pipeline` as background jobs (`service.jobs`) with a live progress panel.
 
-## 7. Testing / acceptance
+Ship Phase 0 + both Phase-A Explorers first; that's the decision point. Lock the
+visual/ethos conventions in Phase A before any concurrency (B/C).
 
-- The UI is a thin layer, so keep logic out of it; anything non-trivial (e.g. a
-  job runner, a mapping-writeback helper) gets a unit test. Don't try to
-  "pytest the Streamlit widgets."
-- Acceptance: launch locally; for each page confirm it renders real engine output
-  with source tags + downside-first + separate sub-scores; confirm an overlay
-  toggle never changes `composite_rank`; confirm model downloads open in Excel;
-  confirm a blocked/credential-less overlay shows a clear note, not a crash.
+## 8. Testing / acceptance
+
+- **Test the service layer (§4), not the widgets.** All non-rendering logic lives
+  there and gets unit tests (view-model shape, source tags present, overlay
+  columns marked non-primary, rank-unchanged invariant, mapping write-back, the
+  job runner). Don't try to "pytest the Streamlit widgets" or scrape HTML.
+- Acceptance (per Phase-A Explorer, both stacks): launch locally; each view
+  renders real engine output with source tags + downside-first + separate
+  sub-scores; an overlay toggle never changes `composite_rank`; model downloads
+  open in Excel; a blocked/credential-less overlay shows a clear note, not a
+  crash. The two Explorers should be feature-identical so the comparison is about
+  stack feel, not coverage.
 - Keep the existing 208-test suite green; the UI must not require engine changes
-  that break it.
+  that break it. New tests are additive (service layer + job runner).
 
-## 8. Current state (as of this handoff)
+## 9. Current state (as of this handoff)
 
-- Branch: `claude/dazzling-lamport-wQ0M5` (tip `4131ebd`), **208 tests passing**,
-  CI green on 3.11/3.12.
+- Branch: `claude/dazzling-lamport-wQ0M5`, **208 tests passing**, CI green on
+  3.11/3.12. (Confirm the live tip with `git log --oneline -1` before building.)
 - All engines + 4 overlays are built and live-verified. `VERIFY.md` is the
-  manual runbook; `data/raw/HOLDINGS.md` documents the universe CSVs.
-- Build the UI on this branch (or a feature branch off it); update CLAUDE.md's
-  non-goals + repo map as the first commit.
+  manual runbook; `data/raw/HOLDINGS.md` documents the universe CSVs;
+  `models/MODEL_NOTES.md` the model methodology.
+- Build the UI on this branch (or a feature branch off it). **First commit:**
+  update CLAUDE.md's non-goals + repo map (web UI now in scope: thin, local,
+  no auth/DB/hosting). **Second:** the §4 service layer. Then the bake-off.
