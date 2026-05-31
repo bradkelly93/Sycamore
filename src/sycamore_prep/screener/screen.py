@@ -484,22 +484,36 @@ def run_screener(
     # ---- TradingView technical overlay (NON-PRIMARY context) ----
     # Quarantined per CLAUDE.md (bottom-up only): spliced in AFTER the composite
     # and rank are final, so it is structurally unable to reach score_universe.
-    # Any failure degrades to full fundamental output with the TA columns absent.
+    # Any failure (disabled in config, network/CSV/creds absent) degrades to the
+    # full fundamental output with the TA columns absent + a clear, actionable
+    # skip note — mirrors the vol overlay and the pipeline's missing-universe
+    # message; never a silent no-op and never a bare traceback.
     cfg = load_config()
-    if tv_overlay and cfg.tradingview.enabled:
-        try:
-            tv_df = _tv_provider(cfg.tradingview.mode).get_screen(
-                tickers=list(out.index), refresh=refresh_tv
+    tv_note: str | None = None
+    if tv_overlay:
+        if not cfg.tradingview.enabled:
+            tv_note = (
+                "tv overlay skipped: set tradingview.enabled: true in config.yaml "
+                "(and choose mode: trend | csv | api) to enable the TradingView "
+                "technical overlay. The fundamental screen is unaffected."
             )
-            out = _apply_tv_overlay(out, tv_df, cfg.tradingview)
-        except Exception as exc:  # noqa: BLE001 — overlay must never break the screen
-            print(f"[tv-overlay] skipped: {exc}", file=sys.stderr)
+        else:
+            try:
+                tv_df = _tv_provider(cfg.tradingview.mode).get_screen(
+                    tickers=list(out.index), refresh=refresh_tv
+                )
+                out = _apply_tv_overlay(out, tv_df, cfg.tradingview)
+            except Exception as exc:  # noqa: BLE001 — overlay must never break the screen
+                tv_note = f"tv overlay skipped: {exc}"
+                print(f"[tv-overlay] {tv_note}", file=sys.stderr)
 
     # Optional NON-PRIMARY prediction-market annotations. Joined as separate
     # event_* columns — never merged into composite_score/rank (CLAUDE.md:
-    # the prediction lens is walled off from every scoring path).
+    # the prediction lens is walled off from every scoring path). Returns a clear
+    # skip note when nothing surfaced (egress blocked / no confirmed mappings).
+    prediction_note: str | None = None
     if with_prediction_overlay:
-        out = _attach_prediction_overlay(out)
+        out, prediction_note = _attach_prediction_overlay(out)
 
     # Reorder columns: identity, sub-scores prominent, then components and
     # sources, and finally the NON-PRIMARY TradingView overlay columns — kept to
@@ -524,9 +538,12 @@ def run_screener(
     rest = [c for c in out.columns if c not in front and c not in tv_tail]
     out = out[front + rest + tv_tail]
 
-    # Surface the vol-overlay note (e.g. "skipped: no creds") without coupling
-    # library code to the CLI — the command reads it off the frame.
+    # Surface the overlay notes (e.g. "skipped: no creds") off the frame so the
+    # CLI can print them without coupling library code to typer. Each is None
+    # when its overlay ran clean or was not requested.
     out.attrs["vol_note"] = vol_note
+    out.attrs["tv_note"] = tv_note
+    out.attrs["prediction_note"] = prediction_note
 
     output_path = Path(output_path) if output_path else (cache_dir() / "screener_output.xlsx")
     _write_screener_xlsx(out, output_path)
@@ -568,15 +585,17 @@ def _write_screener_xlsx(df: pd.DataFrame, path: Path) -> None:
     wb.save(path)
 
 
-def _attach_prediction_overlay(out: pd.DataFrame) -> pd.DataFrame:
+def _attach_prediction_overlay(out: pd.DataFrame) -> tuple[pd.DataFrame, str | None]:
     """Join NON-PRIMARY prediction-market annotations (event_* columns) onto the
-    screener output.
+    screener output. Returns ``(annotated_frame, note)``.
 
     Best-effort and isolated: it never raises into the screen (Polymarket egress
     is often blocked), and it NEVER feeds composite_score/rank — a separate lens
     per CLAUDE.md. `event_contradiction` flags an otherwise high-ranked, clean
     name that nonetheless carries a material market-implied RISK — exactly the
-    signal the bottom-up screen can't see.
+    signal the bottom-up screen can't see. `note` is a clear, actionable message
+    when the overlay surfaced nothing (egress blocked / no confirmed mappings),
+    else None — so a skip is never a silent no-op or a bare traceback.
     """
     try:
         from ..adapters import PolymarketProvider
@@ -600,6 +619,15 @@ def _attach_prediction_overlay(out: pd.DataFrame) -> pd.DataFrame:
             & (~neg)
             & (rank.fillna(n) <= (n / 2.0))
         )
+        note = None
+        if prob.notna().sum() == 0:
+            note = (
+                "prediction overlay: no confirmed market mappings surfaced. Run "
+                "`prediction-discover` and set confirmed=True in "
+                "data/raw/prediction_markets.csv (needs Polymarket egress). The "
+                "event_* columns are blank; the fundamental screen is unaffected."
+            )
+        return out, note
     except Exception as exc:  # noqa: BLE001 — overlay must never break the screen
         out["event_overlay_error"] = str(exc)
-    return out
+        return out, f"prediction overlay skipped: {exc}"

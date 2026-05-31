@@ -181,9 +181,13 @@ def screen_cmd(
         "event_top_prob", "event_contradiction",
     ] if c in df.columns]
     typer.echo(df[cols_to_show].head(20).to_string())
-    note = df.attrs.get("vol_note")
-    if note:
-        typer.secho(note, fg=typer.colors.YELLOW)
+    # Surface any overlay skip notes (vol / TradingView / prediction) so a
+    # missing-creds / disabled / egress-blocked overlay is an explicit,
+    # actionable message — never a silent no-op.
+    for key in ("vol_note", "tv_note", "prediction_note"):
+        note = df.attrs.get(key)
+        if note:
+            typer.secho(note, fg=typer.colors.YELLOW)
 
 
 @app.command("vol")

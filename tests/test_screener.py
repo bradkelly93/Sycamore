@@ -14,6 +14,7 @@ from sycamore_prep.adapters import cache as cache_mod
 from sycamore_prep.adapters.csv_screen import CsvScreenProvider
 from sycamore_prep.adapters.edgar import EdgarProvider
 from sycamore_prep.adapters.tradingview import SOURCE_TAG, TradingViewProvider
+from sycamore_prep.config import load_config
 from sycamore_prep.screener import run_screener
 from sycamore_prep.screener import screen as screen_mod
 from sycamore_prep.screener.scoring import score_universe
@@ -241,6 +242,53 @@ def test_overlay_resilient_on_tv_failure(patched_adapters: Path, monkeypatch):
     assert out.loc["AAA", "composite_rank"] == 1
     assert pd.notna(out.loc["AAA", "q1_quality_score"])
     assert "passes_screen" not in out.columns
+    # ... and the skip is an explicit, actionable note rather than a silent gap.
+    note = out.attrs.get("tv_note")
+    assert note and "skipped" in note and "tradingview endpoint down" in note
+
+
+def test_tv_overlay_skips_with_clear_note_when_disabled(patched_adapters: Path, monkeypatch):
+    """`--tv-overlay` with tradingview.enabled=False must not silently no-op:
+    it degrades to the full fundamental screen plus an actionable note telling
+    the analyst how to turn the overlay on (mirrors the pipeline's missing-
+    universe message)."""
+    disabled = load_config().model_copy(deep=True)
+    disabled.tradingview.enabled = False
+    monkeypatch.setattr(screen_mod, "load_config", lambda: disabled)
+    out = run_screener(
+        tickers=["AAA", "BBB"], skip_market_cap=True,
+        output_path=patched_adapters / "tv_disabled.xlsx", tv_overlay=True,
+    )
+    # Full fundamental output, no TradingView columns, no traceback.
+    assert out.loc["AAA", "composite_rank"] == 1
+    assert "passes_screen" not in out.columns
+    note = out.attrs.get("tv_note")
+    assert note and "enabled" in note and "config.yaml" in note
+
+
+def test_prediction_overlay_skips_with_clear_note_offline(patched_adapters: Path, monkeypatch):
+    """`--with-prediction-overlay` with no confirmed mapping (egress blocked /
+    empty CSV) degrades cleanly: full screen, blank event_* columns, and a clear,
+    actionable skip note — never a traceback."""
+    # Pin the mapping to a non-existent path so the overlay loads an empty
+    # mapping and never touches the network, regardless of local data/raw/.
+    monkeypatch.setattr(
+        "sycamore_prep.prediction_markets.mapping.mapping_csv_path",
+        lambda: patched_adapters / "no_such_mapping.csv",
+    )
+    out = run_screener(
+        tickers=["AAA", "BBB"], skip_market_cap=True,
+        output_path=patched_adapters / "pred.xlsx", with_prediction_overlay=True,
+    )
+    # Fundamental ranking intact; event columns present but blank.
+    assert out.loc["AAA", "composite_rank"] == 1
+    assert out.loc["BBB", "composite_rank"] == 2
+    assert "event_top_prob" in out.columns
+    assert out["event_top_prob"].isna().all()
+    assert not out["event_contradiction"].any()
+    # Actionable skip note that points at the fix.
+    note = out.attrs.get("prediction_note")
+    assert note and "prediction-discover" in note
 
 
 def test_tv_provider_factory():
