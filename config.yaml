@@ -49,6 +49,40 @@ polymarket:
 prediction:
   mapping_csv: "prediction_markets.csv"
   contradiction_prob: 0.20
+  # Crypto/sports/pop-culture markets are dropped in the COMPANY + PEER
+  # apertures (short peer tickers like ET/PR/ASB collide with "Eastern Time",
+  # "People's Republic", "ASB Classic"). The MACRO aperture is NOT filtered —
+  # a long-dated crypto market is kept there as a risk-appetite/liquidity gauge.
+  # Tokens are matched whole (not substring), case-insensitive. Edit freely.
+  noise_category_tokens:
+    - crypto
+    - bitcoin
+    - ethereum
+    - solana
+    - dogecoin
+    - xrp
+    - bnb
+    - sports
+    - esports
+    - soccer
+    - tennis
+    - basketball
+    - baseball
+    - hockey
+    - football
+    - nba
+    - nfl
+    - mlb
+    - nhl
+    - ufc
+    - mma
+    - golf
+    - celebrities
+    - celebrity
+    - music
+    - culture
+    - entertainment
+    - movies
   # Industry aperture: GICS sector → keyword searches on Polymarket.
   sector_keywords:
     Energy: ["oil price", "WTI crude", "OPEC production", "natural gas price"]
@@ -66,3 +100,9 @@ prediction:
       applies_to: ["*"]
     - query: "WTI crude oil price 2026"
       applies_to: ["Energy", "Materials"]
+    # NON-PRIMARY risk-appetite / liquidity gauge, NOT a per-company signal.
+    # Scoped to risk-on sectors; segregated in the macro aperture (never feeds
+    # the screener). "reach" keeps the long-dated price-level market and drops
+    # the intraday "up or down" scalps below the relevance threshold.
+    - query: "Bitcoin reach 2026"
+      applies_to: ["Energy", "Materials", "Consumer Discretionary", "Financials"]

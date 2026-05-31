@@ -49,6 +49,20 @@ class MacroMarketSpec(BaseModel):
     applies_to: list[str] = Field(default_factory=lambda: ["*"])
 
 
+# Category/tag tokens that mark a prediction market as off-thesis noise
+# (crypto, sports/esports, pop-culture) for a bottom-up equity pitch. Applied
+# only in the company + peer apertures — the macro aperture intentionally keeps
+# crypto (a long-dated BTC market is a risk-appetite/liquidity gauge there).
+# This is the schema default; config.yaml's `prediction.noise_category_tokens`
+# overrides it so the list is tunable without a code change.
+DEFAULT_NOISE_CATEGORY_TOKENS: list[str] = [
+    "crypto", "bitcoin", "ethereum", "solana", "dogecoin", "xrp", "bnb",
+    "sports", "esports", "soccer", "tennis", "basketball", "baseball",
+    "hockey", "football", "nba", "nfl", "mlb", "nhl", "ufc", "mma", "golf",
+    "celebrities", "celebrity", "music", "culture", "entertainment", "movies",
+]
+
+
 class PredictionConfig(BaseModel):
     # Editable ticker→market mapping, under data/raw/.
     mapping_csv: str = "prediction_markets.csv"
@@ -56,6 +70,10 @@ class PredictionConfig(BaseModel):
     sector_keywords: dict[str, list[str]] = Field(default_factory=dict)
     # Macro aperture: broad markets + the sectors they read through to.
     macro_markets: list[MacroMarketSpec] = Field(default_factory=list)
+    # Crypto/sports/pop-culture tags dropped in the company + peer apertures.
+    noise_category_tokens: list[str] = Field(
+        default_factory=lambda: list(DEFAULT_NOISE_CATEGORY_TOKENS)
+    )
     # A confirmed RISK market at/above this implied prob, on an otherwise
     # high-ranked name, is surfaced as a screener contradiction flag.
     contradiction_prob: float = 0.20

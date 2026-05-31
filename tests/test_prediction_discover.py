@@ -6,7 +6,7 @@ from __future__ import annotations
 import pandas as pd
 
 from sycamore_prep.adapters.base import EventProbabilityProvider, MARKET_COLUMNS
-from sycamore_prep.config import load_config
+from sycamore_prep.config import MacroMarketSpec, load_config
 from sycamore_prep.prediction_markets.discover import (
     _is_noise_category,
     discover_for_ticker,
@@ -128,6 +128,30 @@ def test_is_noise_category_token_matched():
     assert not _is_noise_category(None)
 
 
+def test_is_noise_category_honors_configured_tokens():
+    # The token set is configurable — callers pass it from config. A custom set
+    # both narrows (crypto no longer noise) and widens (a new token IS noise).
+    custom = ["sports", "politics"]
+    assert not _is_noise_category("Crypto, Bitcoin", custom)  # crypto dropped
+    assert _is_noise_category("Politics, Elections", custom)  # politics added
+    assert _is_noise_category("Sports, Soccer", custom)
+    assert not _is_noise_category("Crypto, Bitcoin", [])      # empty = no filter
+
+
+def test_config_noise_tokens_and_crypto_macro_lens_loaded():
+    """config.yaml is the source of truth for the noise list and exposes a
+    crypto macro market scoped to risk-on sectors only (NOT '*')."""
+    cfg = load_config()
+    toks = {t.lower() for t in cfg.prediction.noise_category_tokens}
+    assert {"crypto", "sports", "tennis"} <= toks
+    crypto_macro = [s for s in cfg.prediction.macro_markets
+                    if "bitcoin" in s.query.lower()]
+    assert crypto_macro, "expected a crypto macro market in config"
+    applies = set(crypto_macro[0].applies_to)
+    assert "*" not in applies  # risk-on only, never market-wide
+    assert {"Energy", "Materials", "Consumer Discretionary", "Financials"} == applies
+
+
 def test_peer_false_positives_dropped_by_name_search_and_category_filter():
     """The exact bug: peers ET/PR/ASB matched crypto/sports markets via their
     bare tickers. Post-fix the peer aperture searches by COMPANY NAME and drops
@@ -201,6 +225,59 @@ def test_peer_falls_back_to_ticker_when_name_unresolvable():
         apertures=["peer"], min_relevance=0.3, peer_name_resolver=resolver,
     )
     assert list(df["slug"]) == ["civi-2026"]
+
+
+def test_crypto_dropped_in_peer_but_kept_in_macro():
+    """Crypto is noise for a PEER (no per-company signal) but allowed in MACRO
+    (risk-appetite/liquidity gauge). Same market, opposite treatment by
+    aperture — the macro aperture is never noise-filtered."""
+    btc = _mkt("btc-200k-2026", "Will Bitcoin reach $200,000 by 2026?",
+               category="Crypto, Crypto Prices, Bitcoin")
+    cfg = _cfg_with_peers(MTDR=["XYZ"])
+    cfg.prediction.macro_markets.clear()
+    cfg.prediction.macro_markets.append(
+        MacroMarketSpec(query="Bitcoin reach 2026", applies_to=["Energy"])
+    )
+    prov = _FakeProvider({
+        "Bitcoin reach 2026": [btc],   # macro query hits it
+        "Some Peer Co": [btc],         # peer name search hits the same market
+    })
+    resolver = {"XYZ": "Some Peer Co"}.get
+
+    # Peer aperture (Energy sector irrelevant here) → crypto dropped.
+    peer_df = discover_for_ticker(
+        prov, "MTDR", "Matador", "Energy", cfg,
+        apertures=["peer"], min_relevance=0.3, peer_name_resolver=resolver,
+    )
+    assert peer_df.empty
+
+    # Macro aperture, risk-on sector → crypto kept.
+    macro_df = discover_for_ticker(
+        prov, "MTDR", "Matador", "Energy", cfg,
+        apertures=["macro"], min_relevance=0.3, peer_name_resolver=resolver,
+    )
+    assert list(macro_df["slug"]) == ["btc-200k-2026"]
+    assert macro_df.iloc[0]["aperture"] == "macro"
+
+
+def test_crypto_macro_lens_scoped_to_risk_on_sectors():
+    """The crypto macro market fires for a risk-on sector but not others."""
+    btc = _mkt("btc-200k-2026", "Will Bitcoin reach $200,000 by 2026?",
+               category="Crypto, Bitcoin")
+    cfg = _cfg_with_peers()
+    cfg.prediction.macro_markets.clear()
+    cfg.prediction.macro_markets.append(
+        MacroMarketSpec(query="Bitcoin reach 2026",
+                        applies_to=["Energy", "Materials", "Financials"])
+    )
+    prov = _FakeProvider({"Bitcoin reach 2026": [btc]})
+
+    energy = discover_for_ticker(prov, "MTDR", "Matador", "Energy", cfg,
+                                 apertures=["macro"], min_relevance=0.3)
+    industrials = discover_for_ticker(prov, "CW", "Curtiss", "Industrials", cfg,
+                                      apertures=["macro"], min_relevance=0.3)
+    assert list(energy["slug"]) == ["btc-200k-2026"]   # risk-on → fires
+    assert industrials.empty                            # not risk-on → silent
 
 
 def test_upsert_preserves_human_edits_and_adds_new_candidates():

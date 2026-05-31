@@ -21,7 +21,7 @@ from functools import lru_cache
 import pandas as pd
 
 from ..adapters.base import EventProbabilityProvider
-from ..config import AppConfig
+from ..config import AppConfig, DEFAULT_NOISE_CATEGORY_TOKENS
 
 
 # Corporate-form / filler tokens that shouldn't drive a match.
@@ -32,27 +32,20 @@ _STOP = {
 }
 _WORD = re.compile(r"[A-Za-z0-9']+")
 
-# Category/tag tokens that mark a market as off-thesis noise for a bottom-up
-# equity pitch (crypto, sports/esports, pop-culture). Polymarket exposes this
-# as event-level `tags` (e.g. ['Crypto','Bitcoin'], ['Sports','Soccer']); the
-# adapter folds those into the `category` column. Applied to the company + peer
-# apertures only — the industry/macro apertures keep everything (a recession
-# market is tagged 'Economy'/'Business' and must survive). Token-matched (not
-# substring) so 'mma' can't hit inside 'summary'.
-_NOISE_CATEGORY_TOKENS = {
-    "crypto", "bitcoin", "ethereum", "solana", "dogecoin", "xrp", "bnb",
-    "sports", "esports", "soccer", "tennis", "basketball", "baseball",
-    "hockey", "football", "nba", "nfl", "mlb", "nhl", "ufc", "mma", "golf",
-    "celebrities", "celebrity", "music", "culture", "entertainment", "movies",
-}
 
+def _is_noise_category(category: object, noise_tokens: object = None) -> bool:
+    """True if a market's category/tags mark it crypto/sports/pop-culture.
 
-def _is_noise_category(category: object) -> bool:
-    """True if a market's category/tags mark it crypto/sports/pop-culture."""
+    `noise_tokens` is the configurable set from
+    `config.prediction.noise_category_tokens` (falls back to the canonical
+    default when None). Token-matched, not substring — so 'mma' can't hit
+    inside 'summary' nor 'nba' inside 'urbana'.
+    """
     if not category:
         return False
-    toks = {w.lower() for w in _WORD.findall(str(category))}
-    return bool(toks & _NOISE_CATEGORY_TOKENS)
+    tokens = DEFAULT_NOISE_CATEGORY_TOKENS if noise_tokens is None else noise_tokens
+    cat_toks = {w.lower() for w in _WORD.findall(str(category))}
+    return bool(cat_toks & {str(t).lower() for t in tokens})
 
 
 def _tokens(text: str) -> list[str]:
@@ -185,6 +178,7 @@ def discover_for_ticker(
     raw ticker is used only when name resolution fails. The company + peer
     apertures additionally drop crypto/sports/pop-culture markets."""
     resolve_peer = peer_name_resolver or _edgar_name_resolver()
+    noise_tokens = {str(t).lower() for t in cfg.prediction.noise_category_tokens}
     candidates: list[dict] = []
 
     def collect(markets: pd.DataFrame, aperture: str, match_name: str,
@@ -195,7 +189,8 @@ def discover_for_ticker(
         has_category = "category" in markets.columns
         for slug, grp in markets.groupby("slug"):
             row0 = grp.iloc[0]
-            if drop_noise and has_category and _is_noise_category(row0.get("category")):
+            if (drop_noise and has_category
+                    and _is_noise_category(row0.get("category"), noise_tokens)):
                 continue
             question = str(row0["question"])
             rel = relevance_score(match_name, question, match_ticker)
