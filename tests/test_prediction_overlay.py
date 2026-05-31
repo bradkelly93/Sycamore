@@ -146,3 +146,52 @@ def test_empty_when_nothing_confirmed(tmp_path, monkeypatch, provider):
     ]).to_csv(empty, index=False)
     df = build_overlay(provider, mapping_path=empty, confirmed_only=True)
     assert df.empty
+
+
+# --------------------------------------------------------------------------- #
+# Time-to-resolution filter: near-dated markets are nearly decided, so their
+# implied prob is backward-looking — drop them (and surface days_to_resolution).
+# --------------------------------------------------------------------------- #
+
+from sycamore_prep.prediction_markets.discover import days_to_resolution, _passes_horizon  # noqa: E402
+
+
+def test_days_to_resolution_and_horizon_helpers():
+    assert days_to_resolution("2026-12-31", as_of="2026-06-01") == 213
+    assert days_to_resolution(None) is None
+    assert days_to_resolution("not-a-date") is None
+    # Far-out market passes; near-dated fails; unknown date always passes.
+    assert _passes_horizon("2026-12-31", 30, as_of="2026-06-01") is True
+    assert _passes_horizon("2026-06-10", 30, as_of="2026-06-01") is False
+    assert _passes_horizon(None, 30, as_of="2026-06-01") is True
+    assert _passes_horizon("2026-06-10", 0, as_of="2026-06-01") is True   # filter disabled
+
+
+def _near_far_provider():
+    # near: resolves 5 days after as_of (2026-05-30) -> dropped by the 30d filter.
+    near = _mkt_rows("fed-imminent", "Fed cut at the next meeting?", 0.02)
+    for r in near:
+        r["resolution_date"] = "2026-06-04"
+    far = _mkt_rows("recession", "US recession by end 2026?", 0.35)  # 2026-12-31, kept
+    return _FakeProvider({"fed-imminent": near, "recession": far})
+
+
+def test_build_overlay_drops_near_dated_markets(tmp_path, monkeypatch):
+    monkeypatch.setattr(cache_mod, "cache_dir", lambda: tmp_path)
+    mp = tmp_path / "prediction_markets.csv"
+    pd.DataFrame([
+        {"ticker": "UMBF", "aperture": "industry", "slug": "fed-imminent",
+         "question": "Fed cut at the next meeting?", "event_type": "macro",
+         "direction": "risk", "relevance_score": 0.7, "confirmed": True, "notes": ""},
+        {"ticker": "UMBF", "aperture": "industry", "slug": "recession",
+         "question": "US recession by end 2026?", "event_type": "macro",
+         "direction": "risk", "relevance_score": 0.7, "confirmed": True, "notes": ""},
+    ]).to_csv(mp, index=False)
+
+    df = build_overlay(_near_far_provider(), mapping_path=mp, confirmed_only=True)
+    slugs = set(df["slug"])
+    assert "recession" in slugs            # far-dated kept
+    assert "fed-imminent" not in slugs     # near-dated (5d) dropped
+    # The surfaced market carries a days_to_resolution column.
+    assert "days_to_resolution" in df.columns
+    assert int(df[df["slug"] == "recession"]["days_to_resolution"].iloc[0]) > 30

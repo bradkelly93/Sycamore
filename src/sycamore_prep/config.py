@@ -128,6 +128,13 @@ class PredictionConfig(BaseModel):
     # A confirmed RISK market at/above this implied prob, on an otherwise
     # high-ranked name, is surfaced as a screener contradiction flag.
     contradiction_prob: float = 0.20
+    # Minimum days to resolution for a market to carry forward-looking signal.
+    # A market resolving in ~2 weeks is nearly decided — its implied prob is
+    # backward-looking, not a live risk read (a "Fed cut by the meeting 2 weeks
+    # out" sits near 0/1). Drop markets resolving sooner than this in both
+    # discovery and the overlay. 0 disables the filter; a market with no parsable
+    # resolution date is always kept (can't judge it).
+    min_days_to_resolution: int = 30
 
 
 class AppConfig(BaseModel):

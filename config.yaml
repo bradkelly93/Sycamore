@@ -106,6 +106,12 @@ polymarket:
 prediction:
   mapping_csv: "prediction_markets.csv"
   contradiction_prob: 0.20
+  # Minimum days to resolution for a market to carry forward-looking signal. A
+  # market resolving in ~2 weeks is nearly decided, so its implied prob is
+  # backward-looking (a "Fed cut by the meeting 2 weeks out" sits near 0/1).
+  # Markets resolving sooner are dropped in discovery + overlay; ones with no
+  # parsable date are kept. 0 disables the filter.
+  min_days_to_resolution: 30
   # Max candidate markets kept per search query (after relevance filtering).
   # Threshold-laddered markets ("Bitcoin reach $100k/$110k/.../$500k", the WTI
   # strike ladder) otherwise return dozens of near-identical rows per name. Keep

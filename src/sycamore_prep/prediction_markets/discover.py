@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import re
 from collections.abc import Callable
+from datetime import date
 from difflib import SequenceMatcher
 from functools import lru_cache
 
@@ -22,6 +23,31 @@ import pandas as pd
 
 from ..adapters.base import EventProbabilityProvider
 from ..config import AppConfig, DEFAULT_NOISE_CATEGORY_TOKENS
+
+
+def days_to_resolution(resolution_date: object, as_of: object = None) -> int | None:
+    """Calendar days from `as_of` (default today) to a market's resolution date.
+    None when the date is missing/unparsable — callers keep such markets (can't
+    judge time-to-resolution, so don't drop on it)."""
+    if resolution_date is None:
+        return None
+    try:
+        res = pd.Timestamp(str(resolution_date)[:10])
+    except (ValueError, TypeError):
+        return None
+    if pd.isna(res):
+        return None
+    base = pd.Timestamp(str(as_of)[:10]) if as_of else pd.Timestamp(date.today())
+    return int((res.normalize() - base.normalize()).days)
+
+
+def _passes_horizon(resolution_date: object, min_days: int, as_of: object = None) -> bool:
+    """True if the market resolves far enough out to carry forward-looking
+    signal (or its date is unknown). A near-dated market is nearly decided."""
+    if not min_days:
+        return True
+    d = days_to_resolution(resolution_date, as_of)
+    return d is None or d >= min_days
 
 
 # Corporate-form / filler tokens that shouldn't drive a match.
@@ -190,6 +216,7 @@ def discover_for_ticker(
     resolve_peer = peer_name_resolver or _edgar_name_resolver()
     noise_tokens = {str(t).lower() for t in cfg.prediction.noise_category_tokens}
     cap = cfg.prediction.max_markets_per_query
+    min_days = cfg.prediction.min_days_to_resolution
     candidates: list[dict] = []
 
     def collect(markets: pd.DataFrame, aperture: str, match_name: str,
@@ -198,11 +225,17 @@ def discover_for_ticker(
             return
         drop_noise = aperture in _NOISE_FILTERED_APERTURES
         has_category = "category" in markets.columns
+        has_res = "resolution_date" in markets.columns
         hits: list[dict] = []
         for slug, grp in markets.groupby("slug"):
             row0 = grp.iloc[0]
             if (drop_noise and has_category
                     and _is_noise_category(row0.get("category"), noise_tokens)):
+                continue
+            # Drop near-dated markets — a market resolving within `min_days` is
+            # nearly decided, so its implied prob is backward-looking, not a live
+            # risk read. Markets with no parsable date are kept.
+            if has_res and not _passes_horizon(row0.get("resolution_date"), min_days):
                 continue
             question = str(row0["question"])
             rel = relevance_score(match_name, question, match_ticker)

@@ -20,13 +20,14 @@ from ..adapters import cache as cache_mod
 from ..adapters.base import EventProbabilityProvider
 from ..config import AppConfig, load_config
 from . import mapping as mapping_mod
+from .discover import _passes_horizon, days_to_resolution
 
 
 OVERLAY_COLUMNS = [
     "ticker", "aperture", "event_type", "direction", "read_through",
     "question", "implied_prob", "prob_chg_30d", "liquidity", "volume",
-    "resolution_date", "relevance_score", "confirmed", "slug", "as_of",
-    "url", "source",
+    "resolution_date", "days_to_resolution", "relevance_score", "confirmed",
+    "slug", "as_of", "url", "source",
 ]
 
 _RT_RANK = {"RISK": 0, "OPPORTUNITY": 1, "WATCH": 2}
@@ -148,6 +149,7 @@ def build_overlay(
         return pd.DataFrame(columns=OVERLAY_COLUMNS)
 
     contradiction_prob = cfg.prediction.contradiction_prob
+    min_days = cfg.prediction.min_days_to_resolution
     rows: list[dict] = []
     for _, r in m.iterrows():
         try:
@@ -159,6 +161,12 @@ def build_overlay(
             continue
         as_of = str(pick.get("as_of") or "")
         as_of_date = as_of[:10] if as_of else str(date.today())
+        res_date = pick.get("resolution_date")
+        # A confirmed market may since have gone near-dated — re-check the
+        # horizon here so the overlay only surfaces markets that still price
+        # live uncertainty (matches the discovery-time filter).
+        if not _passes_horizon(res_date, min_days, as_of_date):
+            continue
         prob = _to_float(pick.get("implied_prob"))
         rows.append({
             "ticker": r["ticker"],
@@ -171,7 +179,8 @@ def build_overlay(
             "prob_chg_30d": _prob_change(str(r["slug"]), pick.get("outcome"), prob, as_of_date),
             "liquidity": _to_float(pick.get("liquidity")),
             "volume": _to_float(pick.get("volume")),
-            "resolution_date": pick.get("resolution_date"),
+            "resolution_date": res_date,
+            "days_to_resolution": days_to_resolution(res_date, as_of_date),
             "relevance_score": _to_float(r.get("relevance_score")),
             "confirmed": bool(r.get("confirmed")),
             "slug": r["slug"],
