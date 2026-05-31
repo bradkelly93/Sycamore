@@ -216,8 +216,9 @@ class TastytradeProvider(VolatilityProvider):
     def _login(self) -> str:
         if not self._client_secret or not self._refresh_token:
             raise TastytradeError(
-                "tastytrade OAuth credentials missing. Set TASTYTRADE_CLIENT_SECRET "
-                "and TASTYTRADE_REFRESH_TOKEN in your environment (never config.yaml). "
+                "tastytrade OAuth credentials missing. Set TASTYTRADE_CLIENT_ID, "
+                "TASTYTRADE_CLIENT_SECRET and TASTYTRADE_REFRESH_TOKEN in your "
+                "environment (never config.yaml), all from the same OAuth app. "
                 "Create them under 'OAuth Applications' in your tastytrade account."
             )
         # tastytrade's OAuth2 refresh-token grant wants form-encoded fields and
