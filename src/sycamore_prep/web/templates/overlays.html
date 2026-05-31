@@ -1,22 +1,24 @@
 {% extends "base.html" %}{% import "macros.html" as m %}
 {% block content %}
-<h1>Overlays <span class="muted">— NON-PRIMARY, walled off from scoring</span></h1>
+<h1>Market overlays — extra context</h1>
+<p class="lead">These are optional, market-opinion lenses: what the <b>options market</b> thinks about risk, what the
+<b>price chart</b> is doing, and what <b>prediction markets</b> imply about specific events. They're useful color —
+but, on purpose, <b>none of them ever change a stock's score or rank.</b> The investment case stays bottom-up.</p>
 
-<div class="nonprimary">
-  <span class="tag">NON-PRIMARY</span> Prediction-market mapping (Polymarket).
-  These never feed the three-attribute score or any fair-value path.
+<div class="context">
+  <span class="tag">CONTEXT ONLY</span> &nbsp;<b>Prediction markets (Polymarket)</b> — implied odds of company / industry /
+  macro events. A way to sanity-check event risk, never a score input.
   {% if mapping.note %}<div class="note">{{ mapping.note }}</div>{% endif %}
-  <p class="muted">Source CSV: <code>{{ mapping.path_note }}</code> ·
-    confirmed {{ mapping.counts.get('confirmed', 0) }} ·
-    annotated {{ mapping.counts.get('annotated', 0) }} ·
-    machine-owned {{ mapping.counts.get('machine_owned', 0) }}</p>
-
+  <p class="muted">Source file: <code>{{ mapping.path_note }}</code> · confirmed {{ mapping.counts.get('confirmed', 0) }} ·
+     annotated {{ mapping.counts.get('annotated', 0) }} · machine-suggested {{ mapping.counts.get('machine_owned', 0) }}.</p>
   {% if mapping.rows %}
-  <table style="margin-top:8px;">
-    <tr><th>Confirmed</th><th>Ticker</th><th>Aperture</th><th>Question</th><th>Event</th><th>Direction</th><th>Relevance</th><th>Notes</th></tr>
+  <table style="margin-top:6px;">
+    <tr><th>{{ m.term("Confirmed","You've reviewed this market and want it included. Editing happens in a later version — read-only here.") }}</th>
+      <th>Ticker</th><th>Scope</th><th>Market question</th><th>Event type</th><th>Direction</th>
+      <th>{{ m.term("Relevance","How closely this market matches the company (0–1).") }}</th><th>Notes</th></tr>
     {% for r in mapping.rows %}
     <tr {% if r.human_owned %}style="background:#f3fbf4"{% endif %}>
-      <td><input type="checkbox" disabled {% if r.confirmed %}checked{% endif %}></td>
+      <td>{{ '✓' if r.confirmed else '—' }}</td>
       <td>{{ r.ticker }}</td><td>{{ r.aperture or '' }}</td>
       <td title="{{ r.slug }}">{{ r.question or '' }}</td>
       <td>{{ r.event_type or '' }}</td><td>{{ r.direction or '' }}</td>
@@ -25,13 +27,11 @@
     {% endfor %}
   </table>
   {% endif %}
-  <p class="muted" style="margin-top:8px;">Phase A is read-only — the checkboxes are display-only.
-    The write-back confirm table (toggle &amp; persist) is wired in Phase B.</p>
 </div>
 
-<div class="nonprimary">
-  <span class="tag">NON-PRIMARY</span> Volatility (tastytrade) &amp; technical (TradingView) overlays
-  attach per-name on the Screener and Name-workup pages — run a screen with the
-  <em>vol</em> / <em>technical</em> toggles, or open a workup with vol enabled.
+<div class="context">
+  <span class="tag">CONTEXT ONLY</span> &nbsp;<b>Volatility &amp; technical trend</b> attach to individual names.
+  To see them, run the <b>Screener</b> with the “Volatility” / “Technical trend” boxes ticked, or open a
+  <b>Company deep-dive</b> — the options-market risk read appears there, clearly walled off from the valuation.
 </div>
 {% endblock %}

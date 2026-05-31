@@ -1,84 +1,122 @@
 {% extends "base.html" %}{% import "macros.html" as m %}
 {% block content %}
-<h1>Name workup — {{ ticker }}</h1>
-{% if err %}<div class="err">{{ err }}</div>{% endif %}
+<h1>Company deep-dive — {{ ticker }}</h1>
+<p class="lead">The full valuation for one company, <b>downside first</b>: what you could lose if you're wrong is shown
+before what you could make. Use it to decide whether the risk/reward is attractive. Business facts come from
+<b>SEC filings</b> (<span class="dot p">●</span>); prices and market figures are market data (<span class="dot np">●</span>).</p>
+
+{% if err %}<div class="err">Couldn't build this deep-dive: {{ err }}</div>{% endif %}
 {% if view %}
   <p>{{ view.name or '' }}{% if view.is_bank %} <span class="chip ok">bank</span>{% endif %}
-     · price {{ m.figure(view.price) }} · mkt cap {{ m.figure(view.market_cap) }}
-     · peers: {{ view.peers | join(', ') or '—' }} <span class="muted">({{ view.peers_source }})</span></p>
+     · share price {{ m.figure(view.price) }} · company size {{ m.figure(view.market_cap) }}
+     · compared against: {{ view.peers | join(', ') or '—' }}</p>
   {% if view.error %}<div class="note">{{ view.error }}</div>{% endif %}
 
   <div class="downside">
-    <strong>Downside first.</strong>
-    base margin of safety {{ m.figure(view.base_margin_of_safety) }} ·
-    implied growth priced in {{ m.figure(view.base_implied_growth) }}
-    <span class="muted">(WACC {{ m.figure(view.wacc) }}, terminal g {{ m.figure(view.terminal_growth) }})</span>
+    <b>The downside view first.</b><br>
+    {{ m.term("Margin of safety", "How far below our estimated fair value the stock trades today. Positive = a cushion; negative (red) = it's already above fair value.") }}:
+      <span class="big">{{ m.figure(view.base_margin_of_safety) }}</span> &nbsp;·&nbsp;
+    {{ m.term("Growth the market is pricing in", "The profit growth you'd have to believe to justify today's price (a reverse DCF). Lower = less heroic assumptions baked in.") }}:
+      {{ m.figure(view.base_implied_growth) }}
+    <div class="muted" style="font-size:12px; margin-top:4px;">Assumes a {{ m.figure(view.wacc) }} discount rate and {{ m.figure(view.terminal_growth) }} long-run growth.</div>
   </div>
 
-  <h2>Reverse DCF — bear · base · bull</h2>
+  <h2>Three valuation scenarios</h2>
+  <p class="lead">What the stock is worth if things go badly, normally, or well. We lead with the <b>downside case</b>.</p>
   <div class="grid3">
+    {% set names = {"bear":"Downside case","base":"Base case","bull":"Upside case"} %}
     {% for c in view.dcf_cases %}
-    <div class="card">
-      <h3>{{ c.label | capitalize }}</h3>
+    <div class="card {{ 'bad' if c.label=='bear' }}">
+      <h4>{{ names.get(c.label, c.label|capitalize) }}</h4>
+      <div class="muted" style="font-size:11px;">Estimated fair value / share</div>
       <div class="big">{{ m.figure(c.fair_value_per_share) }}</div>
-      <div>MoS {{ m.figure(c.margin_of_safety) }}</div>
-      <div class="muted">implied g {{ m.figure(c.implied_growth) }} · assumed g {{ m.figure(c.assumed_growth) }}</div>
-      <div class="muted">price {{ m.figure(c.current_price) }}</div>
+      <div>{{ m.term("Margin of safety", "Fair value vs. today's price. Negative (red) = above fair value.") }}: {{ m.figure(c.margin_of_safety) }}</div>
+      <div class="muted" style="font-size:12px;">market is pricing in {{ m.figure(c.implied_growth) }} growth</div>
     </div>
     {% endfor %}
   </div>
 
-  <h2>Quality &amp; current multiples</h2>
+  <h2>Is it a good business? Is it cheap?</h2>
   <table>
-    <tr>{% for k in view.quality %}<th>{{ k }}</th>{% endfor %}{% for k in view.current %}<th>{{ k }}</th>{% endfor %}</tr>
-    <tr>{% for k, f in view.quality.items() %}<td>{{ m.figure(f) }}</td>{% endfor %}
-        {% for k, f in view.current.items() %}<td>{{ m.figure(f) }}</td>{% endfor %}</tr>
+    <tr>
+      {% set qlabel = {"roic":["Return on capital","Profit earned per dollar of capital invested. Higher = better business."],
+                       "fcf_margin":["Free-cash-flow margin","Cash profit as a % of sales. Higher = better."],
+                       "net_debt_ebitda":["Leverage (net debt ÷ EBITDA)","How indebted the company is. Lower = safer; >3× is amber."]} %}
+      {% set vlabel = {"pe":["Price / earnings","Price per dollar of annual profit. Lower = cheaper."],
+                       "ev_ebitda":["Enterprise value / EBITDA","Whole-company value per dollar of operating profit. Lower = cheaper."],
+                       "fcf_yield":["Free-cash-flow yield","Cash profit as a % of price. Higher = cheaper."],
+                       "p_tbv":["Price / tangible book","Price vs. hard net assets. Lower = cheaper (used for banks)."]} %}
+      {% for k in view.quality %}<th>{{ m.term(qlabel.get(k,[k])[0], qlabel.get(k,['',''])[1]) }}</th>{% endfor %}
+      {% for k in view.current %}<th>{{ m.term(vlabel.get(k,[k])[0], vlabel.get(k,['',''])[1]) }}</th>{% endfor %}
+    </tr>
+    <tr>
+      {% for k, f in view.quality.items() %}<td>{{ m.figure(f) }}</td>{% endfor %}
+      {% for k, f in view.current.items() %}<td>{{ m.figure(f) }}</td>{% endfor %}
+    </tr>
   </table>
 
   {% if view.normalized %}
-  <h2>Normalized / trough earnings <span class="muted">(downside anchor)</span></h2>
+  <h2>Earnings power through the cycle</h2>
+  <p class="lead">Profit at normal margins, and at a <b>low point</b> — so a cheap-looking stock on peak earnings doesn't fool you.</p>
   <table>
-    <tr><th>Normalized EPS</th><th>Normalized P/E</th><th>Trough EPS</th><th>Trough P/E</th><th>Trailing P/E</th></tr>
-    <tr><td>{{ m.figure(view.normalized.normalized_eps) }}</td><td>{{ m.figure(view.normalized.normalized_pe) }}</td>
-        <td>{{ m.figure(view.normalized.trough_eps) }}</td><td>{{ m.figure(view.normalized.trough_pe) }}</td>
-        <td>{{ m.figure(view.normalized.trailing_pe) }}</td></tr>
+    <tr>
+      <th>{{ m.term("Normalized EPS","Earnings per share at mid-cycle (normal) margins.") }}</th>
+      <th>{{ m.term("Normalized P/E","Price ÷ normalized earnings.") }}</th>
+      <th>{{ m.term("Trough EPS","Earnings per share at a downturn low (the downside anchor).") }}</th>
+      <th>{{ m.term("Trough P/E","Price ÷ trough earnings — what you're paying at the low.") }}</th>
+      <th>{{ m.term("Trailing P/E","Price ÷ the last 12 months of actual earnings.") }}</th>
+    </tr>
+    <tr>
+      <td>{{ m.figure(view.normalized.normalized_eps) }}</td><td>{{ m.figure(view.normalized.normalized_pe) }}</td>
+      <td>{{ m.figure(view.normalized.trough_eps) }}</td><td>{{ m.figure(view.normalized.trough_pe) }}</td>
+      <td>{{ m.figure(view.normalized.trailing_pe) }}</td>
+    </tr>
   </table>
   {% endif %}
 
   {% if view.bands %}
-  <h2>Own-history valuation bands</h2>
+  <h2>Cheap or expensive vs. its own history?</h2>
+  <p class="lead">Where today's valuation sits against the company's own past range. A high “cheap percentile” means it's cheap relative to how it has usually traded.</p>
   <table>
-    <tr><th>Multiple</th><th>Current</th><th>Cheap pctile</th><th>Min</th><th>P25</th><th>Median</th><th>P75</th><th>Max</th><th>n</th><th>Direction</th></tr>
+    <tr><th>Measure</th><th>Today</th>
+      <th>{{ m.term("Cheap percentile","100 = cheapest it's been; 0 = most expensive, vs. its own history.") }}</th>
+      <th>Low</th><th>Median</th><th>High</th><th>Years of data</th></tr>
     {% for b in view.bands %}
     <tr><td>{{ b.multiple }}</td><td>{{ m.figure(b.current) }}</td><td>{{ m.figure(b.percentile_cheap) }}</td>
-      <td>{{ m.figure(b.p_min) }}</td><td>{{ m.figure(b.p25) }}</td><td>{{ m.figure(b.median) }}</td>
-      <td>{{ m.figure(b.p75) }}</td><td>{{ m.figure(b.p_max) }}</td><td>{{ b.n }}</td>
-      <td class="muted">{{ 'lower = cheap' if b.lower_is_cheap else 'higher = cheap' }}</td></tr>
+      <td>{{ m.figure(b.p_min) }}</td><td>{{ m.figure(b.median) }}</td><td>{{ m.figure(b.p_max) }}</td><td>{{ b.n }}</td></tr>
     {% endfor %}
   </table>
   {% endif %}
 
   {% if view.vol_panel %}
-  <div class="nonprimary">
-    <span class="tag">NON-PRIMARY</span> volatility (option-implied; data-only downside cross-check)
+  <div class="context">
+    <span class="tag">CONTEXT ONLY</span> &nbsp;<b>Options market's view of risk</b> — a cross-check, never part of the valuation.
     {% if view.vol_panel.note %}<div class="note">{{ view.vol_panel.note }}</div>{% else %}
-    <table style="margin-top:8px;">
-      <tr><th>IV rank</th><th>IV pctile</th><th>IV index</th><th>Exp move 30d</th><th>σ-down price</th><th>Beta</th><th>Flags</th></tr>
-      <tr><td>{{ m.figure(view.vol_panel.iv_rank) }}</td><td>{{ m.figure(view.vol_panel.iv_percentile) }}</td>
-        <td>{{ m.figure(view.vol_panel.iv_index) }}</td><td>{{ m.figure(view.vol_panel.expected_move_30d_pct) }}</td>
-        <td>{{ m.figure(view.vol_panel.sigma_down_30d_price) }}</td><td>{{ m.figure(view.vol_panel.vol_beta) }}</td>
-        <td>{{ m.flags(view.vol_panel.vol_flags) }}</td></tr>
+    <table style="margin-top:10px;">
+      <tr>
+        <th>{{ m.term("Implied-vol rank","How high the option market's expected volatility is vs. the past year (0–100).") }}</th>
+        <th>{{ m.term("Expected move (30d)","The ±% move options imply over the next month.") }}</th>
+        <th>{{ m.term("1-sigma downside price","A rough 1-in-6 downside price target over 30 days.") }}</th>
+        <th>Flags</th>
+      </tr>
+      <tr>
+        <td>{{ m.figure(view.vol_panel.iv_rank) }}</td>
+        <td>{{ m.figure(view.vol_panel.expected_move_30d_pct) }}</td>
+        <td>{{ m.figure(view.vol_panel.sigma_down_30d_price) }}</td>
+        <td>{{ m.flags(view.vol_panel.vol_flags) }}</td>
+      </tr>
     </table>
     {% endif %}
   </div>
   {% endif %}
 
-  <h2>Downloads <span class="muted">(auditable)</span></h2>
+  <h2>Take the work with you</h2>
+  <p class="lead">Every number above traces to a downloadable file.</p>
   <p>
-    {{ m.download(view.comps_artifacts.get('xlsx'), 'comps.xlsx') }}
-    {{ m.download(view.comps_artifacts.get('md'), 'comps tear-sheet.md') }}
-    {% if view.model_artifact %}{{ m.download(view.model_artifact, 'Excel model (download to flex live)') }}
-    {% else %}<span class="muted">· Excel model: not built yet (building the scaffold is a Phase B action; the UI never reimplements the live formulas).</span>{% endif %}
+    {{ m.download(view.comps_artifacts.get('xlsx'), 'Comparables + valuation (Excel)') }}
+    {{ m.download(view.comps_artifacts.get('md'), 'One-page summary (Markdown)') }}
+    {% if view.model_artifact %}{{ m.download(view.model_artifact, 'Editable Excel model') }}
+    {% else %}<span class="muted">· An editable Excel model can be generated separately — by design the tool never re-creates live spreadsheet formulas in the browser.</span>{% endif %}
   </p>
 {% endif %}
 {% endblock %}

@@ -3,99 +3,122 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Sycamore Explorer — {{ active|capitalize or "Universe" }}</title>
+  <title>Sycamore Explorer — {{ (active or "home")|capitalize }}</title>
   <script src="https://unpkg.com/htmx.org@1.9.12"></script>
   <style>
     :root {
       --risk:#b3261e; --risk-bg:#fde8e6; --warn:#9a6700; --warn-bg:#fff4d6;
       --primary:#1a7f37; --np:#6e7781; --np-bg:#f0f1f3; --ink:#1f2328; --line:#d0d7de;
+      --accent:#0969da; --lead:#3d444d;
     }
     * { box-sizing:border-box; }
-    body { margin:0; font:14px/1.45 -apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif; color:var(--ink); }
+    body { margin:0; font:14px/1.5 -apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif; color:var(--ink); }
     .wrap { display:flex; min-height:100vh; }
-    aside { width:280px; flex:0 0 280px; background:#fafbfc; border-right:1px solid var(--line); padding:16px; }
-    main { flex:1; padding:22px 28px; max-width:1200px; }
-    h1 { font-size:20px; margin:0 0 4px; }
-    h2 { font-size:16px; margin:22px 0 8px; border-bottom:1px solid var(--line); padding-bottom:4px; }
-    h3 { font-size:14px; margin:14px 0 6px; }
-    a { color:#0969da; text-decoration:none; } a:hover { text-decoration:underline; }
-    nav a { display:block; padding:6px 8px; border-radius:6px; color:var(--ink); }
-    nav a.on, nav a:hover { background:#eaeef2; text-decoration:none; }
+    aside { width:300px; flex:0 0 300px; background:#fafbfc; border-right:1px solid var(--line); padding:16px; }
+    main { flex:1; padding:22px 30px; max-width:1180px; }
+    h1 { font-size:22px; margin:0 0 2px; }
+    h2 { font-size:16px; margin:26px 0 8px; border-bottom:1px solid var(--line); padding-bottom:4px; }
+    h3 { font-size:13px; margin:14px 0 6px; text-transform:uppercase; letter-spacing:.4px; color:var(--np); }
+    a { color:var(--accent); text-decoration:none; } a:hover { text-decoration:underline; }
+    p.lead { color:var(--lead); font-size:14px; max-width:760px; margin:4px 0 14px; }
     .muted { color:var(--np); }
+    nav a { display:block; padding:7px 10px; border-radius:6px; color:var(--ink); margin-bottom:2px; }
+    nav a small { display:block; color:var(--np); font-size:11px; }
+    nav a.on, nav a:hover { background:#eaeef2; text-decoration:none; }
     table { border-collapse:collapse; width:100%; font-size:13px; }
-    th,td { text-align:left; padding:5px 8px; border-bottom:1px solid var(--line); white-space:nowrap; }
-    th { background:#f6f8fa; position:sticky; top:0; }
+    th,td { text-align:left; padding:6px 9px; border-bottom:1px solid var(--line); white-space:nowrap; vertical-align:top; }
+    th { background:#f6f8fa; position:sticky; top:0; font-weight:600; }
     .fig.risk { color:var(--risk); font-weight:600; }
     .fig.warn { color:var(--warn); }
-    sup.src { font-size:9px; padding:0 3px; border-radius:6px; margin-left:2px; vertical-align:super; }
-    sup.src.primary { background:#dafbe1; color:var(--primary); }
-    sup.src.np { background:var(--np-bg); color:var(--np); }
-    .chip { display:inline-block; font-size:11px; padding:1px 6px; border-radius:10px; margin:1px; }
+    .dot { font-size:9px; margin-left:3px; cursor:help; vertical-align:middle; }
+    .dot.p { color:var(--primary); }
+    .dot.np { color:var(--np); }
+    .term { cursor:help; border-bottom:1px dotted var(--np); }
+    .term sup.q { color:var(--accent); font-size:9px; }
+    .chip { display:inline-block; font-size:11px; padding:1px 7px; border-radius:10px; margin:1px; }
     .chip.risk { background:var(--risk-bg); color:var(--risk); }
     .chip.ok { background:#dafbe1; color:var(--primary); }
-    .nonprimary { border:1px dashed var(--np); background:var(--np-bg); border-radius:8px; padding:10px 12px; margin:10px 0; }
-    .nonprimary .tag { display:inline-block; font-size:10px; font-weight:700; letter-spacing:.5px; color:#fff; background:var(--np); padding:1px 7px; border-radius:10px; }
-    .note { background:#fff8e6; border:1px solid #f0d48a; border-radius:8px; padding:8px 12px; margin:8px 0; font-size:13px; }
-    .err { background:var(--risk-bg); border:1px solid #f0b5b0; color:var(--risk); border-radius:8px; padding:8px 12px; margin:8px 0; }
-    .scorebars { display:grid; gap:3px; min-width:220px; }
-    .scorebar { display:grid; grid-template-columns:64px 1fr auto; gap:6px; align-items:center; }
-    .scorebar .lbl { font-size:11px; color:var(--np); }
-    .scorebar .bar { background:#eaeef2; border-radius:4px; height:9px; overflow:hidden; }
+    .context { border:1px dashed var(--np); background:var(--np-bg); border-radius:8px; padding:12px 14px; margin:12px 0; }
+    .context .tag { display:inline-block; font-size:10px; font-weight:700; letter-spacing:.5px; color:#fff; background:var(--np); padding:2px 8px; border-radius:10px; }
+    .note { background:#fff8e6; border:1px solid #f0d48a; border-radius:8px; padding:9px 13px; margin:10px 0; font-size:13px; }
+    .err { background:var(--risk-bg); border:1px solid #f0b5b0; color:var(--risk); border-radius:8px; padding:9px 13px; margin:10px 0; }
+    .downside { background:#fff8f7; border:1px solid #f0b5b0; border-radius:8px; padding:12px 14px; margin:12px 0; }
+    .downside .big { font-size:22px; font-weight:700; }
+    .grid3 { display:grid; grid-template-columns:repeat(3,1fr); gap:12px; }
+    .card { border:1px solid var(--line); border-radius:8px; padding:12px 14px; }
+    .card.bad { border-color:#f0b5b0; background:#fffafa; }
+    .card h4 { margin:0 0 4px; font-size:13px; }
+    .card .big { font-size:22px; font-weight:700; }
+    .scorebars { display:grid; gap:4px; min-width:260px; }
+    .scorebar { display:grid; grid-template-columns:150px 1fr auto; gap:8px; align-items:center; }
+    .scorebar .lbl { font-size:11px; color:var(--lead); }
+    .scorebar .bar { background:#eaeef2; border-radius:4px; height:10px; overflow:hidden; }
     .scorebar .bar > span { display:block; height:100%; background:#3b82a0; }
-    .dl { display:inline-block; font-size:12px; padding:3px 8px; border:1px solid var(--line); border-radius:6px; margin:2px 4px 2px 0; }
-    .controls label { display:block; font-size:12px; margin:8px 0 2px; color:var(--np); }
-    .controls input[type=text], .controls input[type=number] { width:100%; padding:5px; border:1px solid var(--line); border-radius:6px; }
-    .controls button { margin-top:10px; padding:6px 12px; border:1px solid var(--line); border-radius:6px; background:#0969da; color:#fff; cursor:pointer; }
-    .toggles label { display:inline-block; font-size:12px; margin-right:10px; color:var(--ink); }
-    .cred { font-size:12px; margin:2px 0; }
-    .cred .yes { color:var(--primary); } .cred .no { color:var(--np); }
-    .downside { background:#fff8f7; border:1px solid #f0b5b0; border-radius:8px; padding:10px 12px; margin:8px 0; }
-    .grid3 { display:grid; grid-template-columns:repeat(3,1fr); gap:10px; }
-    .card { border:1px solid var(--line); border-radius:8px; padding:10px 12px; }
-    .big { font-size:20px; font-weight:700; }
+    .dl { display:inline-block; font-size:12px; padding:4px 9px; border:1px solid var(--line); border-radius:6px; margin:2px 5px 2px 0; }
+    .legend { font-size:11.5px; color:var(--lead); background:#fff; border:1px solid var(--line); border-radius:8px; padding:9px 11px; margin-top:14px; }
+    .legend b { color:var(--ink); }
+    details.how { margin-top:12px; font-size:12.5px; }
+    details.how summary { cursor:pointer; color:var(--accent); font-weight:600; }
+    details.how p { color:var(--lead); }
+    form.controls label { display:block; font-size:12px; margin:10px 0 3px; color:var(--lead); font-weight:600; }
+    form.controls input[type=text] { width:100%; padding:6px; border:1px solid var(--line); border-radius:6px; }
+    form.controls .opt { font-weight:400; }
+    form.controls button { margin-top:12px; padding:7px 13px; border:1px solid var(--line); border-radius:6px; background:var(--accent); color:#fff; cursor:pointer; font-size:13px; }
   </style>
 </head>
 <body>
 <div class="wrap">
   <aside>
-    <h1>Sycamore Explorer</h1>
-    <div class="muted" style="font-size:12px; margin-bottom:10px;">read-only · localhost · FastAPI+HTMX</div>
+    <h1 style="font-size:18px;">📈 Sycamore Explorer</h1>
+    <div class="muted" style="font-size:12px; margin-bottom:12px;">A bottom-up value-investing toolkit. Read-only · runs on your machine only.</div>
+
     <nav>
-      <a href="/universe" class="{{ 'on' if active=='universe' }}">Universe</a>
-      <a href="/screener" class="{{ 'on' if active=='screener' }}">Screener</a>
-      <a href="/workup/{{ ticker or 'CW' }}" class="{{ 'on' if active=='workup' }}">Name workup</a>
-      <a href="/pipeline" class="{{ 'on' if active=='pipeline' }}">Pipeline</a>
-      <a href="/spinoffs" class="{{ 'on' if active=='spinoffs' }}">Spin-offs</a>
-      <a href="/overlays" class="{{ 'on' if active=='overlays' }}">Overlays</a>
+      <a href="/universe" class="{{ 'on' if active=='universe' }}">1 · Universe<small>The stocks you can analyze</small></a>
+      <a href="/screener" class="{{ 'on' if active=='screener' }}">2 · Screener<small>Rank them on 3 qualities</small></a>
+      <a href="/workup/{{ ticker or 'CW' }}" class="{{ 'on' if active=='workup' }}">3 · Company deep-dive<small>Full valuation for one name</small></a>
+      <a href="/pipeline" class="{{ 'on' if active=='pipeline' }}">Pipeline reports<small>Saved full-analysis runs</small></a>
+      <a href="/spinoffs" class="{{ 'on' if active=='spinoffs' }}">Spin-offs<small>Recent corporate spin-offs</small></a>
+      <a href="/overlays" class="{{ 'on' if active=='overlays' }}">Market overlays<small>Extra context (never scored)</small></a>
     </nav>
 
-    <h3>Screener controls</h3>
     <form class="controls" action="/screener" method="get">
-      <label>Tickers (space/comma)</label>
-      <input type="text" name="tickers" placeholder="CW WES UMBF" value="{{ (q.tickers if q else '') }}">
-      <label>Sector</label>
-      <input type="text" name="sector" placeholder="Industrials" value="{{ (q.sector if q else '') }}">
-      <div class="toggles" style="margin-top:8px;">
-        <label><input type="checkbox" name="vol" value="true"> vol</label>
-        <label><input type="checkbox" name="tv" value="true"> technical</label>
-        <label><input type="checkbox" name="prediction" value="true"> prediction</label>
+      <label>Screen these stocks <span class="opt muted">(space or comma separated)</span></label>
+      <input type="text" name="tickers" placeholder="e.g. CW WES UMBF" value="{{ (q.tickers if q else '') }}">
+      <label>…or a whole sector <span class="opt muted">(optional)</span></label>
+      <input type="text" name="sector" placeholder="e.g. Industrials" value="{{ (q.sector if q else '') }}">
+      <label>Add market overlays <span class="opt muted">(context only — never change the rank)</span></label>
+      <div style="font-size:12px;">
+        <label style="display:inline; font-weight:400;"><input type="checkbox" name="vol" value="true"> Volatility</label>
+        <label style="display:inline; font-weight:400;"><input type="checkbox" name="tv" value="true"> Technical trend</label>
+        <label style="display:inline; font-weight:400;"><input type="checkbox" name="prediction" value="true"> Prediction markets</label>
       </div>
-      <button type="submit">Run screen</button>
+      <button type="submit">Run the screener →</button>
     </form>
 
-    <h3>Workup</h3>
     <form class="controls" action="/workup/lookup" method="get" onsubmit="this.action='/workup/'+this.t.value.toUpperCase();">
+      <label>Deep-dive one company</label>
       <input type="text" name="t" placeholder="ticker, e.g. CW">
-      <button type="submit">Open workup</button>
+      <button type="submit">Open deep-dive →</button>
     </form>
 
-    <h3>Credentials</h3>
+    <div class="legend">
+      <b>Reading the data</b><br>
+      <span class="dot p">●</span> = from <b>SEC filings</b> (primary, verified)<br>
+      <span class="dot np">●</span> = <b>market data</b> (non-primary / convenience)<br>
+      <span style="color:var(--risk); font-weight:600;">red</span> = downside / risk · <span style="color:var(--warn);">amber</span> = caution<br>
+      <span class="muted">Hover any ● for the exact source.</span>
+    </div>
+
     {% set c = creds %}
-    <div class="cred">SEC user-agent: <span class="{{ 'yes' if c.sec_user_agent.detected else 'no' }}">{{ '✓' if c.sec_user_agent.detected else '✗' }}</span> <span class="muted">({{ c.sec_user_agent.origin }})</span></div>
-    <div class="cred">tastytrade (vol): <span class="{{ 'yes' if c.tastytrade.detected else 'no' }}">{{ '✓' if c.tastytrade.detected else '✗' }}</span></div>
-    <div class="cred">tradingview: <span class="{{ 'yes' if c.tradingview.sessionid_detected else 'no' }}">{{ '✓' if c.tradingview.sessionid_detected else '✗' }}</span> <span class="muted">({{ c.tradingview.mode }}{{ ', enabled' if c.tradingview.enabled }})</span></div>
-    <div class="cred muted" style="margin-top:6px;">WACC {{ '%.1f%%'|format(c.valuation_defaults.wacc*100) }} · g {{ '%.1f%%'|format(c.valuation_defaults.terminal_growth*100) }} · {{ c.valuation_defaults.forecast_years }}y</div>
+    <div class="legend">
+      <b>Data access (from your environment)</b><br>
+      SEC filings: {{ '✓ ready' if c.sec_user_agent.detected else '✗ set a contact in config.yaml' }}<br>
+      Volatility (tastytrade): {{ '✓ connected' if c.tastytrade.detected else '✗ not set (optional)' }}<br>
+      Technical trend: ✓ no login needed<br>
+      <span class="muted">Valuation defaults: discount rate {{ '%.1f%%'|format(c.valuation_defaults.wacc*100) }}, long-run growth {{ '%.1f%%'|format(c.valuation_defaults.terminal_growth*100) }}.</span>
+    </div>
   </aside>
+
   <main>
     {% block content %}{% endblock %}
   </main>

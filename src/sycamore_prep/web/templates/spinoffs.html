@@ -1,11 +1,15 @@
 {% extends "base.html" %}{% import "macros.html" as m %}
 {% block content %}
-<h1>Spin-offs <span class="muted">(read-only)</span></h1>
+<h1>Spin-offs</h1>
+<p class="lead">When a company splits off a division into a new, separately-traded company, the new “spin-off” is often
+mispriced — a classic value-investing hunting ground. This page lists the results of past spin-off scans so you can
+download and review them.</p>
+
 {% if view.note %}<div class="note">{{ view.note }}</div>{% endif %}
 {% if view.artifacts %}
-  <h2>Cached scan / track outputs</h2>
+  <h2>Saved scan results</h2>
   <p>{% for a in view.artifacts %}{{ m.download(a, a.filename) }}{% endfor %}</p>
-  <p class="muted">Downside flags (forced-selling window, negative equity) and the three
-    attributes are kept separate inside each workbook. Live scan/track is a Phase B action.</p>
+  <p class="lead muted">Each file flags the things that matter for a spin-off — forced selling around the split,
+  negative equity, and the three core qualities kept separate.</p>
 {% endif %}
 {% endblock %}

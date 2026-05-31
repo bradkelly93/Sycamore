@@ -1,38 +1,44 @@
 {% extends "base.html" %}{% import "macros.html" as m %}
 {% block content %}
-<h1>Pipeline runs <span class="muted">(read-only)</span></h1>
+<h1>Pipeline reports — saved full runs</h1>
+<p class="lead">A pipeline run does the whole job in one shot: screen the universe, shortlist the best names, and build a
+deep-dive for each — saved to a dated folder you can review or share. This page shows runs you've already produced.
+<span class="muted">(Kicking off a new run is a background job that will live on this page later.)</span></p>
+
 {% if err %}<div class="err">{{ err }}</div>{% endif %}
 {% if not runs %}
-  <div class="note">No pipeline runs in cache yet. Running the funnel is a background job (Phase C);
-    this view renders existing <code>data/cache/pipeline_&lt;ts&gt;/</code> folders.</div>
+  <div class="note">No saved runs yet. When you run the pipeline, each run appears here as a dated report.</div>
 {% else %}
-  <p>Runs:
-    {% for r in runs %}
-      <a href="/pipeline/{{ r.run_token }}">{{ r.name }}</a>{% if not loop.last %} · {% endif %}
-    {% endfor %}
-  </p>
+  <p>Saved runs: {% for r in runs %}<a href="/pipeline/{{ r.run_token }}">{{ r.name }}</a>{% if not loop.last %} · {% endif %}{% endfor %}</p>
 {% endif %}
 
 {% if view %}
-  <h2>{{ view.name }} <span class="muted">— generated {{ view.generated }}</span></h2>
-  <p class="muted">sources: {{ view.sources }}</p>
-  <p>{{ m.download(view.index_artifacts.get('xlsx'), 'index.xlsx') }}
-     {{ m.download(view.index_artifacts.get('md'), 'index.md') }}
-     {{ m.download(view.manifest_artifact, 'manifest.json (run params, reproducibility)') }}</p>
+  <h2>{{ view.name }}</h2>
+  <p class="lead muted">Generated {{ view.generated }}. Sources: {{ view.sources }}.</p>
+  <p>{{ m.download(view.index_artifacts.get('xlsx'), 'Shortlist (Excel)') }}
+     {{ m.download(view.index_artifacts.get('md'), 'Shortlist (Markdown)') }}
+     {{ m.download(view.manifest_artifact, 'Run settings (JSON — for reproducibility)') }}</p>
 
-  <h3>Run params</h3>
-  <table style="max-width:520px;">{% for k, v in view.params.items() %}<tr><td>{{ k }}</td><td>{{ v }}</td></tr>{% endfor %}</table>
+  <h3>What this run was asked to do</h3>
+  <table style="max-width:540px;">{% for k, v in view.params.items() %}<tr><td>{{ k }}</td><td>{{ v }}</td></tr>{% endfor %}</table>
 
-  <h2>Ranked dossiers (downside-first)</h2>
+  <h2>Shortlist <span class="muted" style="font-weight:400;">— ranked, downside shown alongside</span></h2>
   <table>
-    <tr><th>Rank</th><th>Ticker</th><th>Name</th><th>Q1 / Q2 / Q3</th><th>MoS (base)</th><th>Implied g</th><th>Trough P/E</th><th>Flags</th><th>Dossier</th></tr>
+    <tr><th>Rank</th><th>Ticker</th><th>Company</th>
+      <th>Three qualities (0–100)</th>
+      <th>{{ m.term("Margin of safety","Discount to estimated fair value. Negative (red) = above fair value.") }}</th>
+      <th>{{ m.term("Implied growth","Growth the price is assuming.") }}</th>
+      <th>{{ m.term("Trough P/E","Price ÷ earnings at a downturn low.") }}</th>
+      <th>Risk flags</th><th>Files</th></tr>
     {% for d in view.dossiers %}
     <tr {% if d.margin_of_safety_base and d.margin_of_safety_base.flag == 'risk' %}style="background:var(--risk-bg)"{% endif %}>
       <td>{{ d.composite_rank if d.composite_rank is not none else '—' }}</td>
       <td><a href="/workup/{{ d.ticker }}">{{ d.ticker }}</a></td>
-      <td>{{ d.name or '' }}{% if d.is_bank %} <span class="chip ok">bank</span>{% endif %}{% if d.recent_spinoff %} <span class="chip">spin</span>{% endif %}</td>
+      <td>{{ d.name or '' }}{% if d.is_bank %} <span class="chip ok">bank</span>{% endif %}{% if d.recent_spinoff %} <span class="chip">spin-off</span>{% endif %}</td>
       <td><div class="scorebars">
-        {{ m.scorebar(d.q1_quality, "Q1") }}{{ m.scorebar(d.q2_valuation, "Q2") }}{{ m.scorebar(d.q3_improving, "Q3") }}
+        {{ m.scorebar(d.q1_quality, "Business quality", "Returns on capital, margins, low debt.") }}
+        {{ m.scorebar(d.q2_valuation, "Valuation", "How cheap vs. fair value. Higher = cheaper.") }}
+        {{ m.scorebar(d.q3_improving, "Improving", "Revenue / earnings / cash-flow growth.") }}
       </div></td>
       <td>{{ m.figure(d.margin_of_safety_base) }}</td>
       <td>{{ m.figure(d.implied_growth_base) }}</td>

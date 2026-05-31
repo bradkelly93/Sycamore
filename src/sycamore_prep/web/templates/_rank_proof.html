@@ -1,21 +1,21 @@
-{# HTMX partial: the dual-run rank-unchanged proof, swapped into #rank-proof. #}
+{# HTMX partial: the dual-run proof that overlays don't move the rank. #}
 {% if err %}
   <div class="err">{{ err }}</div>
 {% elif proof %}
-  <div style="margin-top:8px;">
+  <div style="margin-top:10px;">
     {% if proof.identical %}
-      <span class="chip ok">✓ composite_rank identical with overlays off vs on</span>
+      <span class="chip ok">✓ Proven: the rank is identical with the overlays OFF and ON</span>
     {% else %}
-      <span class="chip risk">✗ rank changed — investigate (this should never happen)</span>
+      <span class="chip risk">✗ The rank changed — this should never happen; please report it</span>
     {% endif %}
-    <span class="muted">overlays checked: {{ proof.overlays_checked | join(', ') or 'none active' }}</span>
-    {% if proof.note %}<div class="note">{{ proof.note }}</div>{% endif %}
-    <table style="margin-top:6px; max-width:420px;">
+    <p class="muted" style="margin:6px 0;">We ran the screen twice on the same stocks — once with the market overlays
+    off, once with them on — and compared the rank for each. They match, so the overlays are genuinely just context.</p>
+    <table style="max-width:460px;">
       <tr><th>Ticker</th><th>Rank — overlays OFF</th><th>Rank — overlays ON</th></tr>
       {% for r in proof.rows %}
-      <tr><td>{{ r.ticker }}</td><td>{{ r.rank_overlays_off if r.rank_overlays_off is not none else '—' }}</td>
-        <td {% if r.rank_overlays_off != r.rank_overlays_on %}class="fig risk"{% endif %}>
-          {{ r.rank_overlays_on if r.rank_overlays_on is not none else '—' }}</td></tr>
+      <tr><td>{{ r.ticker }}</td>
+        <td>{{ r.rank_overlays_off if r.rank_overlays_off is not none else '—' }}</td>
+        <td {% if r.rank_overlays_off != r.rank_overlays_on %}class="fig risk"{% endif %}>{{ r.rank_overlays_on if r.rank_overlays_on is not none else '—' }}</td></tr>
       {% endfor %}
     </table>
   </div>

@@ -1,53 +1,68 @@
 {% extends "base.html" %}{% import "macros.html" as m %}
 {% block content %}
-<h1>Screener — three-attribute (downside-first)</h1>
+<h1>Screener — rank stocks on three qualities</h1>
+<p class="lead">Enter tickers (or a sector) in the left panel and run the screen. Each stock is scored 0–100 on
+<b>three independent qualities, kept deliberately separate</b> — a great business, a cheap price, and an improving
+trend. A name worth a deep-dive usually scores well on more than one. Higher is better everywhere.</p>
+
 {% if err %}<div class="err">{{ err }}</div>{% endif %}
 {% if not view %}
-  <div class="note">Enter tickers or a sector in the sidebar and run the screen.
-    Fundamentals: SEC EDGAR <strong>(primary)</strong>; prices/market cap: yfinance (non-primary).</div>
+  <div class="note">👈 Start by entering one or more tickers (e.g. <b>CW WES UMBF</b>) in the “Screen these stocks”
+  box on the left, then click <b>Run the screener</b>. Business facts come from <b>SEC filings</b>
+  (<span class="dot p">●</span> primary); prices come from market data (<span class="dot np">●</span> non-primary).</div>
 {% else %}
-  <div class="card" style="margin-bottom:10px;">
-    <strong>Rank integrity.</strong> The NON-PRIMARY overlays never move
-    <code>composite_rank</code> <span class="muted">— {{ view.rank_unchanged.citation }}</span>.
+  <div class="card">
+    <b>Why you can trust the ranking.</b> The optional market overlays (volatility, technical, prediction markets)
+    are shown to the side and <b>never change the rank</b> — the rank comes only from the fundamentals.
     <button hx-post="/screener/verify?tickers={{ q.tickers | urlencode }}&sector={{ q.sector | urlencode }}"
-            hx-target="#rank-proof" hx-swap="innerHTML" hx-indicator="#rp-load">
-      Prove it (re-runs the screen twice)
-    </button>
-    <span id="rp-load" class="htmx-indicator muted">…running</span>
+            hx-target="#rank-proof" hx-swap="innerHTML" hx-indicator="#rp-load">Show me the proof</button>
+    <span id="rp-load" class="htmx-indicator muted">…re-running</span>
     <div id="rank-proof"></div>
   </div>
 
-  {% for k, n in view.notes.items() %}{% if n %}<div class="note"><strong>{{ k }} overlay:</strong> {{ n }}</div>{% endif %}{% endfor %}
+  {% for k, n in view.notes.items() %}{% if n %}<div class="note"><b>{{ k }} overlay:</b> {{ n }}</div>{% endif %}{% endfor %}
 
-  <h2>Ranked names</h2>
-  <p class="muted">{{ m.download(view.screener_artifact, "screener_output.xlsx (full, auditable)") }}</p>
+  <h2>Ranked results <span class="muted" style="font-weight:400;">— worst risks shown in red, best names at the top</span></h2>
   <table>
-    <tr><th>Rank</th><th>Ticker</th><th>Name</th><th>Q1 / Q2 / Q3 — kept separate</th><th>Negative space</th><th>Mkt cap</th></tr>
+    <tr>
+      <th>{{ m.term("Rank", "Sort order by the overall blend. It is NOT a fourth score — the three qualities are kept separate on purpose.") }}</th>
+      <th>Ticker</th><th>Company</th>
+      <th>The three qualities (0–100, higher is better)</th>
+      <th>{{ m.term("Risk flags", "Automatic red flags, e.g. negative free cash flow or an extreme valuation. ‘none’ = clean.") }}</th>
+      <th>{{ m.term("Market cap", "Company size = share price × shares outstanding.") }}</th>
+    </tr>
     {% for r in view.rows %}
     <tr {% if r.flag == 'risk' %}style="background:var(--risk-bg)"{% endif %}>
       <td>{{ r.composite_rank if r.composite_rank is not none else '—' }}</td>
-      <td><a href="/workup/{{ r.ticker }}">{{ r.ticker }}</a></td>
+      <td><a href="/workup/{{ r.ticker }}" title="Open the full deep-dive">{{ r.ticker }}</a></td>
       <td>{{ r.name or '' }}{% if r.is_bank %} <span class="chip ok">bank</span>{% endif %}</td>
       <td><div class="scorebars">
-        {{ m.scorebar(r.q1_quality, "Q1 Qual") }}
-        {{ m.scorebar(r.q2_valuation, "Q2 Val") }}
-        {{ m.scorebar(r.q3_improving, "Q3 Impr") }}
+        {{ m.scorebar(r.q1_quality, "Business quality", "How good the business is — high returns on capital, strong margins, low debt.") }}
+        {{ m.scorebar(r.q2_valuation, "Valuation (cheapness)", "How cheap the stock looks vs. estimated fair value. Higher = cheaper.") }}
+        {{ m.scorebar(r.q3_improving, "Improving trend", "Whether results are getting better — revenue, earnings and cash-flow growth.") }}
       </div></td>
       <td>{{ m.flags(r.ns_flags) }}</td>
       <td>{{ m.figure(r.market_cap) }}</td>
     </tr>
     {% endfor %}
   </table>
+  <p>{{ m.download(view.screener_artifact, "Download the full results, every metric (Excel)") }}</p>
 
+  {% set olabel = {
+    "iv_rank":"Implied-vol rank", "iv_percentile":"Implied-vol percentile", "iv_index":"Implied volatility",
+    "expected_move_30d_pct":"Expected move (30 days)", "passes_screen":"Passes trend screen",
+    "tv_divergence":"Trend vs. fundamentals", "event_top_prob":"Top event probability",
+    "event_contradiction":"Risk-vs-rank contradiction"} %}
   {% set vol_show = view.overlay_columns.vol | reject('in', ['vol_flags', 'vol_source']) | list %}
-  {% if view.overlay_columns.vol or view.overlay_columns.tv or view.overlay_columns.prediction %}
-  <div class="nonprimary">
-    <span class="tag">NON-PRIMARY</span> overlays — market context only; structurally walled off from the score &amp; rank.
-    <table style="margin-top:8px;">
+  {% if vol_show or view.overlay_columns.tv or view.overlay_columns.prediction %}
+  <div class="context">
+    <span class="tag">CONTEXT ONLY</span> &nbsp;Market-opinion overlays — useful color, but they do
+    <b>not</b> feed the scores or the rank above (that's the whole point of keeping them here).
+    <table style="margin-top:10px;">
       <tr><th>Ticker</th>
-        {% for c in vol_show %}<th>{{ c }}</th>{% endfor %}
-        {% for c in view.overlay_columns.tv %}<th>{{ c }}</th>{% endfor %}
-        {% for c in view.overlay_columns.prediction %}<th>{{ c }}</th>{% endfor %}
+        {% for c in vol_show %}<th>{{ olabel.get(c, c) }}</th>{% endfor %}
+        {% for c in view.overlay_columns.tv %}<th>{{ olabel.get(c, c) }}</th>{% endfor %}
+        {% for c in view.overlay_columns.prediction %}<th>{{ olabel.get(c, c) }}</th>{% endfor %}
       </tr>
       {% for r in view.rows %}
       <tr><td>{{ r.ticker }}</td>

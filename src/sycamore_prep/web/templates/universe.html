@@ -1,49 +1,59 @@
 {% extends "base.html" %}{% import "macros.html" as m %}
 {% block content %}
-<h1>Universe</h1>
+<h1>Universe — the stocks you can analyze</h1>
+<p class="lead">These are Sycamore Capital's <b>actual fund holdings</b> — the names their managers own across the
+<b>Established Value</b> (mid-cap) and <b>Small-Company Opportunity</b> (small-cap) funds. This is the opportunity
+set everything else works from. Click any ticker to open its deep-dive.</p>
+
+<details class="how"><summary>New here? How the whole tool works (30-second read)</summary>
+<p><b>1 · Universe</b> (this page) — the names available to analyze.
+<b>2 · Screener</b> — rank those names on three independent qualities (good business, cheap price, improving trend).
+<b>3 · Company deep-dive</b> — the full, downside-first valuation for one name.
+<b>Pipeline reports</b> — save a complete run (screen + a deep-dive per name) as a folder you can share.
+<b>Market overlays</b> — optional volatility / technical / prediction-market context that is <b>never</b> used to
+score or rank anything. Everything traces back to its source (hover any ● dot).</p></details>
 
 {% if view.built %}
-  <p><span class="big">{{ view.count }}</span> investable names ·
-     <strong>{{ view.sycamore_owned }}</strong> Sycamore-owned</p>
-  <div style="display:flex; gap:30px; flex-wrap:wrap;">
-    <div>
-      <h3>By source</h3>
-      <table>{% for k, v in view.source_breakdown.items() %}<tr><td>{{ k }}</td><td>{{ v }}</td></tr>{% endfor %}</table>
-    </div>
-    <div>
-      <h3>By GICS sector</h3>
-      <table>{% for k, v in view.sector_breakdown.items() %}<tr><td>{{ k }}</td><td>{{ v }}</td></tr>{% endfor %}</table>
-    </div>
+  <h2>Built investable table</h2>
+  <p class="lead">A de-duplicated master list the screener and pipeline draw from.</p>
+  <p><span class="downside" style="display:inline-block;padding:6px 12px;"><b>{{ view.count }}</b> companies ·
+     <b>{{ view.sycamore_owned }}</b> held by a Sycamore fund</span></p>
+  <div style="display:flex; gap:36px; flex-wrap:wrap;">
+    <div><h3>Where each name came from</h3>
+      <table>{% for k, v in view.source_breakdown.items() %}<tr><td>{{ k }}</td><td>{{ v }}</td></tr>{% endfor %}</table></div>
+    <div><h3>By industry sector</h3>
+      <table>{% for k, v in view.sector_breakdown.items() %}<tr><td>{{ k }}</td><td>{{ v }}</td></tr>{% endfor %}</table></div>
   </div>
-  <p>{{ m.download(view.csv_artifact, "universe.csv") }}</p>
+  <p style="margin-top:10px;">{{ m.download(view.csv_artifact, "Download the full table (CSV)") }}</p>
 {% else %}
   <div class="note">{{ view.instructions }}</div>
 {% endif %}
 
-<h2>Victory Sycamore fund holdings</h2>
+<h2>Sycamore Capital fund holdings</h2>
 {% if view.sycamore_note %}<div class="note">{{ view.sycamore_note }}</div>{% endif %}
 {% if view.sycamore_holdings %}
-  <p class="muted">Disclosed holdings used as the Sycamore overlay (not a live EDGAR pull — source-tagged accordingly).</p>
-  <div style="display:flex; gap:30px; flex-wrap:wrap;">
-    <div>
-      <h3>By fund</h3>
-      <table>{% for k, v in view.sycamore_funds.items() %}<tr><td>{{ k }}</td><td>{{ v }}</td></tr>{% endfor %}</table>
-    </div>
-    <div>
-      <h3>By sector</h3>
-      <table>{% for k, v in view.sycamore_sectors.items() %}<tr><td>{{ k }}</td><td>{{ v }}</td></tr>{% endfor %}</table>
-    </div>
+  <p class="lead">The funds' disclosed positions. <span class="muted">These are reported holdings supplied as a file
+  (<span class="dot np">●</span> non-primary), not a live SEC pull — labelled honestly so you always know what's verified.</span></p>
+  <div style="display:flex; gap:36px; flex-wrap:wrap;">
+    <div><h3>By fund</h3>
+      <table>{% for k, v in view.sycamore_funds.items() %}<tr><td>{{ k }}</td><td>{{ v }} holdings</td></tr>{% endfor %}</table></div>
+    <div><h3>By industry sector</h3>
+      <table>{% for k, v in view.sycamore_sectors.items() %}<tr><td>{{ k }}</td><td>{{ v }}</td></tr>{% endfor %}</table></div>
   </div>
 
-  <h3>Holdings ({{ view.sycamore_holdings | length }})</h3>
+  <h3>All holdings ({{ view.sycamore_holdings | length }})</h3>
   <table>
-    <tr><th>Fund</th><th>Ticker</th><th>Company</th><th>Sector</th><th>Weight</th><th>Position $</th></tr>
+    <tr>
+      <th>Fund</th><th>Ticker</th><th>Company</th><th>Sector</th>
+      <th>{{ m.term("Portfolio weight", "How big this position is as a % of the fund.") }}</th>
+      <th>{{ m.term("Position value", "Dollar value of the fund's stake (not the company's market cap).") }}</th>
+    </tr>
     {% for h in view.sycamore_holdings %}
     <tr>
-      <td class="muted">{{ 'EV' if 'Established' in (h.fund or '') else ('SCO' if 'Small' in (h.fund or '') else (h.fund or '')) }}</td>
-      <td><a href="/workup/{{ h.ticker }}">{{ h.ticker }}</a></td>
-      <td>{{ h.name or '' }}</td>
-      <td>{{ h.gics_sector or '' }}</td>
+      <td class="muted">{{ "Established Value" if "Established" in (h.fund or "") else ("Small-Company Opp." if "Small" in (h.fund or "") else (h.fund or "")) }}</td>
+      <td><a href="/workup/{{ h.ticker }}" title="Open the deep-dive">{{ h.ticker }}</a></td>
+      <td>{{ h.name or "" }}</td>
+      <td>{{ h.gics_sector or "" }}</td>
       <td>{{ m.figure(h.weight_pct) }}</td>
       <td>{{ m.figure(h.position_value) }}</td>
     </tr>

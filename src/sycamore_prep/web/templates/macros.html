@@ -1,22 +1,26 @@
-{# Reusable render macros. The §3 metadata is already on each Figure; these only style it. #}
+{# Render macros. The §3 metadata is already on each Figure; these only style it. #}
+
+{% macro src_dot(f) %}
+  {%- if f -%}<span class="dot {{ 'p' if f.primary else 'np' }}" title="source: {{ f.source }}{{ ' — from SEC filings (primary, verified)' if f.primary else ' — market data (non-primary)' }}">●</span>{%- endif -%}
+{% endmacro %}
 
 {% macro figure(f) %}
   {%- if f and f.value is not none -%}
-    <span class="fig{{ ' risk' if f.flag=='risk' }}{{ ' warn' if f.flag=='warn' }}" title="source: {{ f.source }}">
-      {{- f.value | fmt_value(f.fmt) -}}
-      <sup class="src {{ 'primary' if f.primary else 'np' }}" title="source: {{ f.source }}">{{ 'P' if f.primary else 'NP' }}</sup>
-    </span>
+    <span class="fig{{ ' risk' if f.flag=='risk' }}{{ ' warn' if f.flag=='warn' }}" title="source: {{ f.source }}">{{ f.value | fmt_value(f.fmt) }}</span>{{ src_dot(f) }}
   {%- else -%}<span class="muted">—</span>{%- endif -%}
 {% endmacro %}
 
+{# A column header / label with a plain-English tooltip. #}
+{% macro term(label, tip) %}<span class="term" title="{{ tip }}">{{ label }}<sup class="q">?</sup></span>{% endmacro %}
+
 {% macro flags(items) %}
   {%- for x in items -%}<span class="chip risk">{{ x }}</span>{%- endfor -%}
-  {%- if not items -%}<span class="muted">—</span>{%- endif -%}
+  {%- if not items -%}<span class="muted">none</span>{%- endif -%}
 {% endmacro %}
 
-{% macro scorebar(f, label) %}
+{% macro scorebar(f, label, tip) %}
   <div class="scorebar">
-    <span class="lbl">{{ label }}</span>
+    <span class="lbl">{{ term(label, tip) }}</span>
     <span class="bar"><span style="width:{{ f.value if (f and f.value is not none) else 0 }}%"></span></span>
     <span class="val">{{ figure(f) }}</span>
   </div>
