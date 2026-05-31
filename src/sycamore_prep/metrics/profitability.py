@@ -7,6 +7,7 @@ Missing concepts return an empty Series — callers must handle that.
 
 from __future__ import annotations
 
+import numpy as np
 import pandas as pd
 
 from ..adapters.base import FinancialsFrame
@@ -154,7 +155,13 @@ def gross_margin_stability(ff: FinancialsFrame, years: int = 5) -> float:
     Returns 1 - coefficient_of_variation. Higher = more stable. NaN if we
     don't have `years` data points.
     """
-    gm = gross_margin_fy(ff).dropna()
+    gm = gross_margin_fy(ff)
+    # Drop NaN AND ±inf: a near-zero-revenue period yields an infinite margin,
+    # which .dropna() keeps. An inf in the window makes std() compute
+    # `inf - inf` -> NaN + a "invalid value encountered in subtract" warning,
+    # and the coefficient of variation would be meaningless anyway. Filter to
+    # finite observations before the count guard so both stay honest.
+    gm = gm[np.isfinite(gm)]
     if len(gm) < years:
         return float("nan")
     window = gm.tail(years)

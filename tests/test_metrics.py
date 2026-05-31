@@ -31,7 +31,10 @@ from sycamore_prep.metrics import (
     rotce_fy,
     tangible_book_value_fy,
 )
-from sycamore_prep.metrics.profitability import invested_capital_fy
+from sycamore_prep.metrics.profitability import (
+    gross_margin_stability,
+    invested_capital_fy,
+)
 
 
 def _ff(rows: list[dict]) -> FinancialsFrame:
@@ -245,3 +248,39 @@ def test_percentile_vs_history():
     assert percentile_vs_history(hist, 0.08) == pytest.approx(45.0)
     # Too few observations → NaN
     assert math.isnan(percentile_vs_history(pd.Series([0.05, 0.06]), 0.05))
+
+
+def test_gross_margin_stability_ignores_infinite_margin_without_warning():
+    """A near-zero-revenue year makes gross margin = GrossProfit/Revenue blow up
+    to +/-inf. .dropna() keeps inf, so std() over the window would compute
+    `inf - inf` -> NaN + a "invalid value encountered in subtract" RuntimeWarning.
+    Stability must filter to finite observations: no warning, and a clean score
+    from the real years (or NaN if too few remain)."""
+    import warnings
+
+    # 5 clean FY gross margins (0.40) + one zero-revenue year (-> inf margin).
+    rows = []
+    for i, (rev, cogs) in enumerate(
+        [(1000.0, 600.0), (1000.0, 600.0), (1000.0, 600.0),
+         (1000.0, 600.0), (1000.0, 600.0), (0.0, 50.0)]
+    ):
+        p = f"{2019 + i}-12-31"
+        rows.append({"concept": "Revenues", "period": p, "value": rev})
+        rows.append({"concept": "CostOfRevenue", "period": p, "value": cogs})
+    ff = _ff(rows)
+
+    with warnings.catch_warnings():
+        warnings.simplefilter("error")          # any RuntimeWarning -> failure
+        score = gross_margin_stability(ff, years=5)
+    # Five identical finite margins -> CoV 0 -> stability 1.0 (inf year excluded).
+    assert score == pytest.approx(1.0)
+
+
+def test_gross_margin_stability_nan_when_too_few_finite_years():
+    rows = []
+    for i, (rev, cogs) in enumerate([(1000.0, 600.0), (1000.0, 600.0), (0.0, 50.0)]):
+        p = f"{2021 + i}-12-31"
+        rows.append({"concept": "Revenues", "period": p, "value": rev})
+        rows.append({"concept": "CostOfRevenue", "period": p, "value": cogs})
+    # Only 2 finite margins after dropping the inf year -> NaN at years=5.
+    assert math.isnan(gross_margin_stability(_ff(rows), years=5))
