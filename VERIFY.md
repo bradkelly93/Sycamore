@@ -65,6 +65,7 @@ sycamore-prep spinoffs track DHR --spinco VLTO
 ## 4. Volatility overlay — tastytrade (downside cross-check)
 
 ```bash
+export TASTYTRADE_CLIENT_ID=...          # OAuth app client id (required by the refresh grant)
 export TASTYTRADE_CLIENT_SECRET=...      # OAuth app client secret
 export TASTYTRADE_REFRESH_TOKEN=...      # personal grant refresh token
 sycamore-prep vol CW
