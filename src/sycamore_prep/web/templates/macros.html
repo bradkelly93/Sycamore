@@ -1,0 +1,27 @@
+{# Reusable render macros. The §3 metadata is already on each Figure; these only style it. #}
+
+{% macro figure(f) %}
+  {%- if f and f.value is not none -%}
+    <span class="fig{{ ' risk' if f.flag=='risk' }}{{ ' warn' if f.flag=='warn' }}" title="source: {{ f.source }}">
+      {{- f.value | fmt_value(f.fmt) -}}
+      <sup class="src {{ 'primary' if f.primary else 'np' }}" title="source: {{ f.source }}">{{ 'P' if f.primary else 'NP' }}</sup>
+    </span>
+  {%- else -%}<span class="muted">—</span>{%- endif -%}
+{% endmacro %}
+
+{% macro flags(items) %}
+  {%- for x in items -%}<span class="chip risk">{{ x }}</span>{%- endfor -%}
+  {%- if not items -%}<span class="muted">—</span>{%- endif -%}
+{% endmacro %}
+
+{% macro scorebar(f, label) %}
+  <div class="scorebar">
+    <span class="lbl">{{ label }}</span>
+    <span class="bar"><span style="width:{{ f.value if (f and f.value is not none) else 0 }}%"></span></span>
+    <span class="val">{{ figure(f) }}</span>
+  </div>
+{% endmacro %}
+
+{% macro download(ref, label) %}
+  {%- if ref -%}<a class="dl" href="/download/{{ ref.token }}">⬇ {{ label or ref.filename }}</a>{%- endif -%}
+{% endmacro %}

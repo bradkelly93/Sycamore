@@ -1,0 +1,11 @@
+{% extends "base.html" %}{% import "macros.html" as m %}
+{% block content %}
+<h1>Spin-offs <span class="muted">(read-only)</span></h1>
+{% if view.note %}<div class="note">{{ view.note }}</div>{% endif %}
+{% if view.artifacts %}
+  <h2>Cached scan / track outputs</h2>
+  <p>{% for a in view.artifacts %}{{ m.download(a, a.filename) }}{% endfor %}</p>
+  <p class="muted">Downside flags (forced-selling window, negative equity) and the three
+    attributes are kept separate inside each workbook. Live scan/track is a Phase B action.</p>
+{% endif %}
+{% endblock %}

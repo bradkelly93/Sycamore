@@ -1,0 +1,84 @@
+{% extends "base.html" %}{% import "macros.html" as m %}
+{% block content %}
+<h1>Name workup — {{ ticker }}</h1>
+{% if err %}<div class="err">{{ err }}</div>{% endif %}
+{% if view %}
+  <p>{{ view.name or '' }}{% if view.is_bank %} <span class="chip ok">bank</span>{% endif %}
+     · price {{ m.figure(view.price) }} · mkt cap {{ m.figure(view.market_cap) }}
+     · peers: {{ view.peers | join(', ') or '—' }} <span class="muted">({{ view.peers_source }})</span></p>
+  {% if view.error %}<div class="note">{{ view.error }}</div>{% endif %}
+
+  <div class="downside">
+    <strong>Downside first.</strong>
+    base margin of safety {{ m.figure(view.base_margin_of_safety) }} ·
+    implied growth priced in {{ m.figure(view.base_implied_growth) }}
+    <span class="muted">(WACC {{ m.figure(view.wacc) }}, terminal g {{ m.figure(view.terminal_growth) }})</span>
+  </div>
+
+  <h2>Reverse DCF — bear · base · bull</h2>
+  <div class="grid3">
+    {% for c in view.dcf_cases %}
+    <div class="card">
+      <h3>{{ c.label | capitalize }}</h3>
+      <div class="big">{{ m.figure(c.fair_value_per_share) }}</div>
+      <div>MoS {{ m.figure(c.margin_of_safety) }}</div>
+      <div class="muted">implied g {{ m.figure(c.implied_growth) }} · assumed g {{ m.figure(c.assumed_growth) }}</div>
+      <div class="muted">price {{ m.figure(c.current_price) }}</div>
+    </div>
+    {% endfor %}
+  </div>
+
+  <h2>Quality &amp; current multiples</h2>
+  <table>
+    <tr>{% for k in view.quality %}<th>{{ k }}</th>{% endfor %}{% for k in view.current %}<th>{{ k }}</th>{% endfor %}</tr>
+    <tr>{% for k, f in view.quality.items() %}<td>{{ m.figure(f) }}</td>{% endfor %}
+        {% for k, f in view.current.items() %}<td>{{ m.figure(f) }}</td>{% endfor %}</tr>
+  </table>
+
+  {% if view.normalized %}
+  <h2>Normalized / trough earnings <span class="muted">(downside anchor)</span></h2>
+  <table>
+    <tr><th>Normalized EPS</th><th>Normalized P/E</th><th>Trough EPS</th><th>Trough P/E</th><th>Trailing P/E</th></tr>
+    <tr><td>{{ m.figure(view.normalized.normalized_eps) }}</td><td>{{ m.figure(view.normalized.normalized_pe) }}</td>
+        <td>{{ m.figure(view.normalized.trough_eps) }}</td><td>{{ m.figure(view.normalized.trough_pe) }}</td>
+        <td>{{ m.figure(view.normalized.trailing_pe) }}</td></tr>
+  </table>
+  {% endif %}
+
+  {% if view.bands %}
+  <h2>Own-history valuation bands</h2>
+  <table>
+    <tr><th>Multiple</th><th>Current</th><th>Cheap pctile</th><th>Min</th><th>P25</th><th>Median</th><th>P75</th><th>Max</th><th>n</th><th>Direction</th></tr>
+    {% for b in view.bands %}
+    <tr><td>{{ b.multiple }}</td><td>{{ m.figure(b.current) }}</td><td>{{ m.figure(b.percentile_cheap) }}</td>
+      <td>{{ m.figure(b.p_min) }}</td><td>{{ m.figure(b.p25) }}</td><td>{{ m.figure(b.median) }}</td>
+      <td>{{ m.figure(b.p75) }}</td><td>{{ m.figure(b.p_max) }}</td><td>{{ b.n }}</td>
+      <td class="muted">{{ 'lower = cheap' if b.lower_is_cheap else 'higher = cheap' }}</td></tr>
+    {% endfor %}
+  </table>
+  {% endif %}
+
+  {% if view.vol_panel %}
+  <div class="nonprimary">
+    <span class="tag">NON-PRIMARY</span> volatility (option-implied; data-only downside cross-check)
+    {% if view.vol_panel.note %}<div class="note">{{ view.vol_panel.note }}</div>{% else %}
+    <table style="margin-top:8px;">
+      <tr><th>IV rank</th><th>IV pctile</th><th>IV index</th><th>Exp move 30d</th><th>σ-down price</th><th>Beta</th><th>Flags</th></tr>
+      <tr><td>{{ m.figure(view.vol_panel.iv_rank) }}</td><td>{{ m.figure(view.vol_panel.iv_percentile) }}</td>
+        <td>{{ m.figure(view.vol_panel.iv_index) }}</td><td>{{ m.figure(view.vol_panel.expected_move_30d_pct) }}</td>
+        <td>{{ m.figure(view.vol_panel.sigma_down_30d_price) }}</td><td>{{ m.figure(view.vol_panel.vol_beta) }}</td>
+        <td>{{ m.flags(view.vol_panel.vol_flags) }}</td></tr>
+    </table>
+    {% endif %}
+  </div>
+  {% endif %}
+
+  <h2>Downloads <span class="muted">(auditable)</span></h2>
+  <p>
+    {{ m.download(view.comps_artifacts.get('xlsx'), 'comps.xlsx') }}
+    {{ m.download(view.comps_artifacts.get('md'), 'comps tear-sheet.md') }}
+    {% if view.model_artifact %}{{ m.download(view.model_artifact, 'Excel model (download to flex live)') }}
+    {% else %}<span class="muted">· Excel model: not built yet (building the scaffold is a Phase B action; the UI never reimplements the live formulas).</span>{% endif %}
+  </p>
+{% endif %}
+{% endblock %}

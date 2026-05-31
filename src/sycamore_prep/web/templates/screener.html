@@ -1,0 +1,63 @@
+{% extends "base.html" %}{% import "macros.html" as m %}
+{% block content %}
+<h1>Screener — three-attribute (downside-first)</h1>
+{% if err %}<div class="err">{{ err }}</div>{% endif %}
+{% if not view %}
+  <div class="note">Enter tickers or a sector in the sidebar and run the screen.
+    Fundamentals: SEC EDGAR <strong>(primary)</strong>; prices/market cap: yfinance (non-primary).</div>
+{% else %}
+  <div class="card" style="margin-bottom:10px;">
+    <strong>Rank integrity.</strong> The NON-PRIMARY overlays never move
+    <code>composite_rank</code> <span class="muted">— {{ view.rank_unchanged.citation }}</span>.
+    <button hx-post="/screener/verify?tickers={{ q.tickers | urlencode }}&sector={{ q.sector | urlencode }}"
+            hx-target="#rank-proof" hx-swap="innerHTML" hx-indicator="#rp-load">
+      Prove it (re-runs the screen twice)
+    </button>
+    <span id="rp-load" class="htmx-indicator muted">…running</span>
+    <div id="rank-proof"></div>
+  </div>
+
+  {% for k, n in view.notes.items() %}{% if n %}<div class="note"><strong>{{ k }} overlay:</strong> {{ n }}</div>{% endif %}{% endfor %}
+
+  <h2>Ranked names</h2>
+  <p class="muted">{{ m.download(view.screener_artifact, "screener_output.xlsx (full, auditable)") }}</p>
+  <table>
+    <tr><th>Rank</th><th>Ticker</th><th>Name</th><th>Q1 / Q2 / Q3 — kept separate</th><th>Negative space</th><th>Mkt cap</th></tr>
+    {% for r in view.rows %}
+    <tr {% if r.flag == 'risk' %}style="background:var(--risk-bg)"{% endif %}>
+      <td>{{ r.composite_rank if r.composite_rank is not none else '—' }}</td>
+      <td><a href="/workup/{{ r.ticker }}">{{ r.ticker }}</a></td>
+      <td>{{ r.name or '' }}{% if r.is_bank %} <span class="chip ok">bank</span>{% endif %}</td>
+      <td><div class="scorebars">
+        {{ m.scorebar(r.q1_quality, "Q1 Qual") }}
+        {{ m.scorebar(r.q2_valuation, "Q2 Val") }}
+        {{ m.scorebar(r.q3_improving, "Q3 Impr") }}
+      </div></td>
+      <td>{{ m.flags(r.ns_flags) }}</td>
+      <td>{{ m.figure(r.market_cap) }}</td>
+    </tr>
+    {% endfor %}
+  </table>
+
+  {% set vol_show = view.overlay_columns.vol | reject('in', ['vol_flags', 'vol_source']) | list %}
+  {% if view.overlay_columns.vol or view.overlay_columns.tv or view.overlay_columns.prediction %}
+  <div class="nonprimary">
+    <span class="tag">NON-PRIMARY</span> overlays — market context only; structurally walled off from the score &amp; rank.
+    <table style="margin-top:8px;">
+      <tr><th>Ticker</th>
+        {% for c in vol_show %}<th>{{ c }}</th>{% endfor %}
+        {% for c in view.overlay_columns.tv %}<th>{{ c }}</th>{% endfor %}
+        {% for c in view.overlay_columns.prediction %}<th>{{ c }}</th>{% endfor %}
+      </tr>
+      {% for r in view.rows %}
+      <tr><td>{{ r.ticker }}</td>
+        {% for c in vol_show %}<td>{{ m.figure(r.vol[c]) if (r.vol and c in r.vol) else '—' }}</td>{% endfor %}
+        {% for c in view.overlay_columns.tv %}<td>{{ r.tv[c] if (r.tv and c in r.tv and r.tv[c] is not none) else '—' }}</td>{% endfor %}
+        {% for c in view.overlay_columns.prediction %}<td>{{ r.prediction[c] if (r.prediction and c in r.prediction and r.prediction[c] is not none) else '—' }}</td>{% endfor %}
+      </tr>
+      {% endfor %}
+    </table>
+  </div>
+  {% endif %}
+{% endif %}
+{% endblock %}

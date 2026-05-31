@@ -1,0 +1,22 @@
+{# HTMX partial: the dual-run rank-unchanged proof, swapped into #rank-proof. #}
+{% if err %}
+  <div class="err">{{ err }}</div>
+{% elif proof %}
+  <div style="margin-top:8px;">
+    {% if proof.identical %}
+      <span class="chip ok">✓ composite_rank identical with overlays off vs on</span>
+    {% else %}
+      <span class="chip risk">✗ rank changed — investigate (this should never happen)</span>
+    {% endif %}
+    <span class="muted">overlays checked: {{ proof.overlays_checked | join(', ') or 'none active' }}</span>
+    {% if proof.note %}<div class="note">{{ proof.note }}</div>{% endif %}
+    <table style="margin-top:6px; max-width:420px;">
+      <tr><th>Ticker</th><th>Rank — overlays OFF</th><th>Rank — overlays ON</th></tr>
+      {% for r in proof.rows %}
+      <tr><td>{{ r.ticker }}</td><td>{{ r.rank_overlays_off if r.rank_overlays_off is not none else '—' }}</td>
+        <td {% if r.rank_overlays_off != r.rank_overlays_on %}class="fig risk"{% endif %}>
+          {{ r.rank_overlays_on if r.rank_overlays_on is not none else '—' }}</td></tr>
+      {% endfor %}
+    </table>
+  </div>
+{% endif %}

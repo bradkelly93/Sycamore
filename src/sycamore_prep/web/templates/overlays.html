@@ -1,0 +1,37 @@
+{% extends "base.html" %}{% import "macros.html" as m %}
+{% block content %}
+<h1>Overlays <span class="muted">— NON-PRIMARY, walled off from scoring</span></h1>
+
+<div class="nonprimary">
+  <span class="tag">NON-PRIMARY</span> Prediction-market mapping (Polymarket).
+  These never feed the three-attribute score or any fair-value path.
+  {% if mapping.note %}<div class="note">{{ mapping.note }}</div>{% endif %}
+  <p class="muted">Source CSV: <code>{{ mapping.path_note }}</code> ·
+    confirmed {{ mapping.counts.get('confirmed', 0) }} ·
+    annotated {{ mapping.counts.get('annotated', 0) }} ·
+    machine-owned {{ mapping.counts.get('machine_owned', 0) }}</p>
+
+  {% if mapping.rows %}
+  <table style="margin-top:8px;">
+    <tr><th>Confirmed</th><th>Ticker</th><th>Aperture</th><th>Question</th><th>Event</th><th>Direction</th><th>Relevance</th><th>Notes</th></tr>
+    {% for r in mapping.rows %}
+    <tr {% if r.human_owned %}style="background:#f3fbf4"{% endif %}>
+      <td><input type="checkbox" disabled {% if r.confirmed %}checked{% endif %}></td>
+      <td>{{ r.ticker }}</td><td>{{ r.aperture or '' }}</td>
+      <td title="{{ r.slug }}">{{ r.question or '' }}</td>
+      <td>{{ r.event_type or '' }}</td><td>{{ r.direction or '' }}</td>
+      <td>{{ m.figure(r.relevance_score) }}</td><td>{{ r.notes }}</td>
+    </tr>
+    {% endfor %}
+  </table>
+  {% endif %}
+  <p class="muted" style="margin-top:8px;">Phase A is read-only — the checkboxes are display-only.
+    The write-back confirm table (toggle &amp; persist) is wired in Phase B.</p>
+</div>
+
+<div class="nonprimary">
+  <span class="tag">NON-PRIMARY</span> Volatility (tastytrade) &amp; technical (TradingView) overlays
+  attach per-name on the Screener and Name-workup pages — run a screen with the
+  <em>vol</em> / <em>technical</em> toggles, or open a workup with vol enabled.
+</div>
+{% endblock %}

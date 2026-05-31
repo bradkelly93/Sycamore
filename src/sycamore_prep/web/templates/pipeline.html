@@ -1,0 +1,46 @@
+{% extends "base.html" %}{% import "macros.html" as m %}
+{% block content %}
+<h1>Pipeline runs <span class="muted">(read-only)</span></h1>
+{% if err %}<div class="err">{{ err }}</div>{% endif %}
+{% if not runs %}
+  <div class="note">No pipeline runs in cache yet. Running the funnel is a background job (Phase C);
+    this view renders existing <code>data/cache/pipeline_&lt;ts&gt;/</code> folders.</div>
+{% else %}
+  <p>Runs:
+    {% for r in runs %}
+      <a href="/pipeline/{{ r.run_token }}">{{ r.name }}</a>{% if not loop.last %} · {% endif %}
+    {% endfor %}
+  </p>
+{% endif %}
+
+{% if view %}
+  <h2>{{ view.name }} <span class="muted">— generated {{ view.generated }}</span></h2>
+  <p class="muted">sources: {{ view.sources }}</p>
+  <p>{{ m.download(view.index_artifacts.get('xlsx'), 'index.xlsx') }}
+     {{ m.download(view.index_artifacts.get('md'), 'index.md') }}
+     {{ m.download(view.manifest_artifact, 'manifest.json (run params, reproducibility)') }}</p>
+
+  <h3>Run params</h3>
+  <table style="max-width:520px;">{% for k, v in view.params.items() %}<tr><td>{{ k }}</td><td>{{ v }}</td></tr>{% endfor %}</table>
+
+  <h2>Ranked dossiers (downside-first)</h2>
+  <table>
+    <tr><th>Rank</th><th>Ticker</th><th>Name</th><th>Q1 / Q2 / Q3</th><th>MoS (base)</th><th>Implied g</th><th>Trough P/E</th><th>Flags</th><th>Dossier</th></tr>
+    {% for d in view.dossiers %}
+    <tr {% if d.margin_of_safety_base and d.margin_of_safety_base.flag == 'risk' %}style="background:var(--risk-bg)"{% endif %}>
+      <td>{{ d.composite_rank if d.composite_rank is not none else '—' }}</td>
+      <td><a href="/workup/{{ d.ticker }}">{{ d.ticker }}</a></td>
+      <td>{{ d.name or '' }}{% if d.is_bank %} <span class="chip ok">bank</span>{% endif %}{% if d.recent_spinoff %} <span class="chip">spin</span>{% endif %}</td>
+      <td><div class="scorebars">
+        {{ m.scorebar(d.q1_quality, "Q1") }}{{ m.scorebar(d.q2_valuation, "Q2") }}{{ m.scorebar(d.q3_improving, "Q3") }}
+      </div></td>
+      <td>{{ m.figure(d.margin_of_safety_base) }}</td>
+      <td>{{ m.figure(d.implied_growth_base) }}</td>
+      <td>{{ m.figure(d.trough_pe) }}</td>
+      <td>{{ m.flags(d.ns_flags) }}</td>
+      <td>{{ m.download(d.dossier_artifacts.get('comps_xlsx'), 'comps') }}{{ m.download(d.dossier_artifacts.get('model_xlsx'), 'model') }}</td>
+    </tr>
+    {% endfor %}
+  </table>
+{% endif %}
+{% endblock %}
