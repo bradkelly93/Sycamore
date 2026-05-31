@@ -280,6 +280,48 @@ def test_crypto_macro_lens_scoped_to_risk_on_sectors():
     assert industrials.empty                            # not risk-on → silent
 
 
+def test_macro_query_capped_to_top_n_by_relevance_then_volume():
+    """A threshold-laddered macro query (many near-identical strikes) is capped
+    to max_markets_per_query, keeping the highest relevance and, on ties,
+    the highest-volume markets."""
+    # 6 BTC strike markets, identical question shape → identical relevance, so
+    # the tie-breaker is volume. Cap=2 should keep the two highest-volume.
+    ladder = [
+        _mkt(f"btc-reach-{k}", f"Will Bitcoin reach ${k} by 2026?",
+             category="Bitcoin")
+        for k in (100, 150, 200, 250, 300, 500)
+    ]
+    for i, m in enumerate(ladder):
+        m["volume"] = float((i + 1) * 1000)  # 1k..6k; the $500 strike is richest
+    cfg = _cfg_with_peers()
+    cfg.prediction.max_markets_per_query = 2
+    cfg.prediction.macro_markets.clear()
+    cfg.prediction.macro_markets.append(
+        MacroMarketSpec(query="Bitcoin reach 2026", applies_to=["*"])
+    )
+    prov = _FakeProvider({"Bitcoin reach 2026": ladder})
+    df = discover_for_ticker(prov, "MTDR", "Matador", None, cfg,
+                             apertures=["macro"], min_relevance=0.3)
+    assert len(df) == 2
+    # Highest-volume strikes (6k=btc-reach-500, 5k=btc-reach-300) survive.
+    assert set(df["slug"]) == {"btc-reach-500", "btc-reach-300"}
+
+
+def test_max_markets_per_query_zero_disables_cap():
+    ladder = [_mkt(f"m{k}", f"Will Bitcoin reach ${k} by 2026?", category="Bitcoin")
+              for k in range(8)]
+    cfg = _cfg_with_peers()
+    cfg.prediction.max_markets_per_query = 0  # disabled
+    cfg.prediction.macro_markets.clear()
+    cfg.prediction.macro_markets.append(
+        MacroMarketSpec(query="Bitcoin reach 2026", applies_to=["*"])
+    )
+    prov = _FakeProvider({"Bitcoin reach 2026": ladder})
+    df = discover_for_ticker(prov, "MTDR", "Matador", None, cfg,
+                             apertures=["macro"], min_relevance=0.3)
+    assert len(df) == 8  # no cap → all kept
+
+
 def test_upsert_preserves_human_edits_and_adds_new_candidates():
     existing = pd.DataFrame([{
         "ticker": "SAVE", "aperture": "company", "slug": "save-ch11-2026",

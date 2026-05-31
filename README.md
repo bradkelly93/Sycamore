@@ -108,6 +108,20 @@ sycamore-prep prediction-discover --universe --limit 50
 sycamore-prep prediction-discover SAVE --apertures company,peer
 ```
 
+**Noise filtering (company + peer).** Short peer tickers collide with everyday
+words — `ET` (Energy Transfer) with "Eastern Time", `PR` (Permian Resources)
+with "People's Republic", `ASB` (Associated Banc-Corp) with "ASB Classic" — so
+the peer aperture searches by *company name* (resolved via EDGAR), not ticker,
+and the company + peer apertures drop crypto/sports/pop-culture markets
+(`prediction.noise_category_tokens` in `config.yaml`, freely editable).
+
+**Crypto in macro is deliberate.** Crypto is filtered out of company/peer (no
+per-company signal) but *kept* in the **macro** aperture as a risk-appetite /
+liquidity gauge — a long-dated `"Bitcoin reach 2026"` market scoped to risk-on
+sectors. Threshold-laddered markets (the Bitcoin/WTI price strikes) are capped
+to `prediction.max_markets_per_query` (default 3) per query, ranked by relevance
+then traded volume. Macro stays segregated — it never feeds the screener.
+
 Then open `data/raw/prediction_markets.csv`, set `confirmed=True` on the rows
 that genuinely attach to a name, and fix `event_type` / `direction` if the
 keyword guess is off. Re-running discovery refreshes the machine fields

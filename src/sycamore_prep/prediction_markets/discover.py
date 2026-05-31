@@ -48,6 +48,16 @@ def _is_noise_category(category: object, noise_tokens: object = None) -> bool:
     return bool(cat_toks & {str(t).lower() for t in tokens})
 
 
+def _row_volume(row: object) -> float:
+    """Traded volume for a market row, used only as a cap tie-breaker. Missing
+    or non-numeric volume sorts last (0.0)."""
+    try:
+        v = float(row.get("volume"))  # type: ignore[union-attr]
+    except (TypeError, ValueError, AttributeError):
+        return 0.0
+    return v if v == v else 0.0  # NaN-guard
+
+
 def _tokens(text: str) -> list[str]:
     return [w for w in (t.lower() for t in _WORD.findall(text or "")) if w not in _STOP]
 
@@ -179,6 +189,7 @@ def discover_for_ticker(
     apertures additionally drop crypto/sports/pop-culture markets."""
     resolve_peer = peer_name_resolver or _edgar_name_resolver()
     noise_tokens = {str(t).lower() for t in cfg.prediction.noise_category_tokens}
+    cap = cfg.prediction.max_markets_per_query
     candidates: list[dict] = []
 
     def collect(markets: pd.DataFrame, aperture: str, match_name: str,
@@ -187,6 +198,7 @@ def discover_for_ticker(
             return
         drop_noise = aperture in _NOISE_FILTERED_APERTURES
         has_category = "category" in markets.columns
+        hits: list[dict] = []
         for slug, grp in markets.groupby("slug"):
             row0 = grp.iloc[0]
             if (drop_noise and has_category
@@ -197,11 +209,21 @@ def discover_for_ticker(
             if rel < min_relevance:
                 continue
             event_type, direction = guess_event_type_direction(question)
-            candidates.append({
+            hits.append({
                 "ticker": ticker, "aperture": aperture, "slug": slug,
                 "question": question, "event_type": event_type,
                 "direction": direction, "relevance_score": rel,
+                "_volume": _row_volume(row0),
             })
+        # Cap each query's hits to the top-N — threshold-laddered markets
+        # (Bitcoin/WTI price strikes) otherwise return dozens of near-identical
+        # rows. Rank by relevance, tie-broken by traded volume (depth).
+        if cap and len(hits) > cap:
+            hits.sort(key=lambda h: (h["relevance_score"], h["_volume"]), reverse=True)
+            hits = hits[:cap]
+        for h in hits:
+            h.pop("_volume", None)
+            candidates.append(h)
 
     if "company" in apertures:
         collect(provider.search_markets(name), "company", name, ticker)

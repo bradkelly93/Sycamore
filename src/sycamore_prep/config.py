@@ -74,6 +74,12 @@ class PredictionConfig(BaseModel):
     noise_category_tokens: list[str] = Field(
         default_factory=lambda: list(DEFAULT_NOISE_CATEGORY_TOKENS)
     )
+    # Cap on candidate markets kept per search query, after relevance filtering.
+    # Threshold-laddered markets (e.g. "Will Bitcoin reach $100k/$110k/.../$500k"
+    # or the WTI strike ladder) otherwise flood a name with dozens of near-identical
+    # rows; keep the top-N by relevance, tie-broken by traded volume (depth =
+    # credibility). 0 disables the cap.
+    max_markets_per_query: int = 3
     # A confirmed RISK market at/above this implied prob, on an otherwise
     # high-ranked name, is surfaced as a screener contradiction flag.
     contradiction_prob: float = 0.20

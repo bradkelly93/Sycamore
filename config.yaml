@@ -49,6 +49,11 @@ polymarket:
 prediction:
   mapping_csv: "prediction_markets.csv"
   contradiction_prob: 0.20
+  # Max candidate markets kept per search query (after relevance filtering).
+  # Threshold-laddered markets ("Bitcoin reach $100k/$110k/.../$500k", the WTI
+  # strike ladder) otherwise return dozens of near-identical rows per name. Keep
+  # the top-N by relevance, tie-broken by traded volume. 0 disables the cap.
+  max_markets_per_query: 3
   # Crypto/sports/pop-culture markets are dropped in the COMPANY + PEER
   # apertures (short peer tickers like ET/PR/ASB collide with "Eastern Time",
   # "People's Republic", "ASB Classic"). The MACRO aperture is NOT filtered —
