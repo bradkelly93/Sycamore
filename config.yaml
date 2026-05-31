@@ -93,3 +93,78 @@ tradingview:
   cache_ttl_minutes: 1440
   max_results: 20000
   # sessionid: null    # realtime needs your own TradingView sessionid (or TV_SESSIONID)
+# Prediction-market overlay (Polymarket). NON-PRIMARY signal layer — see
+# CLAUDE.md. Read-only (no trading); never feeds the screener composite.
+polymarket:
+  gamma_base_url: "https://gamma-api.polymarket.com"
+  clob_base_url: "https://clob.polymarket.com"
+  rate_limit_rps: 5
+  user_agent: "sycamore-prep/0.1 bradley.kelly93@gmail.com"
+  # Minimum relevance (0–1) for `prediction-discover` to auto-include a match.
+  min_relevance: 0.45
+
+prediction:
+  mapping_csv: "prediction_markets.csv"
+  contradiction_prob: 0.20
+  # Max candidate markets kept per search query (after relevance filtering).
+  # Threshold-laddered markets ("Bitcoin reach $100k/$110k/.../$500k", the WTI
+  # strike ladder) otherwise return dozens of near-identical rows per name. Keep
+  # the top-N by relevance, tie-broken by traded volume. 0 disables the cap.
+  max_markets_per_query: 3
+  # Crypto/sports/pop-culture markets are dropped in the COMPANY + PEER
+  # apertures (short peer tickers like ET/PR/ASB collide with "Eastern Time",
+  # "People's Republic", "ASB Classic"). The MACRO aperture is NOT filtered —
+  # a long-dated crypto market is kept there as a risk-appetite/liquidity gauge.
+  # Tokens are matched whole (not substring), case-insensitive. Edit freely.
+  noise_category_tokens:
+    - crypto
+    - bitcoin
+    - ethereum
+    - solana
+    - dogecoin
+    - xrp
+    - bnb
+    - sports
+    - esports
+    - soccer
+    - tennis
+    - basketball
+    - baseball
+    - hockey
+    - football
+    - nba
+    - nfl
+    - mlb
+    - nhl
+    - ufc
+    - mma
+    - golf
+    - celebrities
+    - celebrity
+    - music
+    - culture
+    - entertainment
+    - movies
+  # Industry aperture: GICS sector → keyword searches on Polymarket.
+  sector_keywords:
+    Energy: ["oil price", "WTI crude", "OPEC production", "natural gas price"]
+    Financials: ["bank failure", "Fed rate cut", "US recession"]
+    Industrials: ["US recession", "government shutdown", "tariffs"]
+    "Health Care": ["FDA approval", "Medicare", "drug pricing"]
+    Materials: ["copper price", "gold price", "China GDP"]
+    "Information Technology": ["AI regulation", "chip export ban"]
+    "Consumer Discretionary": ["US recession", "consumer spending"]
+  # Macro aperture: broad markets + the sectors they read through to.
+  macro_markets:
+    - query: "Fed rate cut 2026"
+      applies_to: ["Financials", "Real Estate", "Utilities", "Consumer Discretionary"]
+    - query: "US recession 2026"
+      applies_to: ["*"]
+    - query: "WTI crude oil price 2026"
+      applies_to: ["Energy", "Materials"]
+    # NON-PRIMARY risk-appetite / liquidity gauge, NOT a per-company signal.
+    # Scoped to risk-on sectors; segregated in the macro aperture (never feeds
+    # the screener). "reach" keeps the long-dated price-level market and drops
+    # the intraday "up or down" scalps below the relevance threshold.
+    - query: "Bitcoin reach 2026"
+      applies_to: ["Energy", "Materials", "Consumer Discretionary", "Financials"]

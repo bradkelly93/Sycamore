@@ -27,6 +27,21 @@ def _yf_symbol(ticker: str) -> str:
     return ticker.upper().replace(".", "-")
 
 
+# yfinance's `sector` vocabulary mostly follows GICS but renames a handful.
+# Normalize to the GICS labels config.yaml + the universe builder use, so a
+# resolved sector matches `prediction.macro_markets[*].applies_to` and
+# `sector_keywords`. Sectors not listed here already match GICS as-is
+# (Energy, Industrials, Utilities, Real Estate, Communication Services).
+_YF_TO_GICS_SECTOR = {
+    "Financial Services": "Financials",
+    "Healthcare": "Health Care",
+    "Technology": "Information Technology",
+    "Consumer Cyclical": "Consumer Discretionary",
+    "Consumer Defensive": "Consumer Staples",
+    "Basic Materials": "Materials",
+}
+
+
 def _yf():
     # Import lazily so unit tests that don't touch yfinance don't need network.
     import yfinance as yf
@@ -96,6 +111,21 @@ class YFinanceProvider(PriceProvider):
         except Exception:  # noqa: BLE001
             pass
         return None
+
+    def get_sector(self, ticker: str) -> str | None:
+        """GICS sector for a ticker (NON-PRIMARY). Used by the prediction
+        overlay to read a typed ticker through its sector-scoped macro markets.
+        Normalizes yfinance's sector names to GICS so they match config's
+        `applies_to` / `sector_keywords`. Returns None if unavailable."""
+        yf = _yf()
+        try:
+            info = self._retry(lambda: yf.Ticker(ticker).get_info())
+        except Exception:  # noqa: BLE001
+            return None
+        sector = info.get("sector") if isinstance(info, dict) else None
+        if not sector:
+            return None
+        return _YF_TO_GICS_SECTOR.get(sector, sector)
 
     def get_shares(self, ticker: str) -> float | None:
         yf = _yf()
