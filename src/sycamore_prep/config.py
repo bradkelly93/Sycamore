@@ -60,6 +60,25 @@ class TastytradeConfig(BaseModel):
     horizon_days: int = 30
 
 
+class TradingViewConfig(BaseModel):
+    """Declarative replica of the analyst's own saved TradingView technical
+    screen. NON-PRIMARY context overlay only — never enters the score (see
+    CLAUDE.md: bottom-up, downside-first). `filters` are AND-combined.
+    """
+    enabled: bool = False
+    mode: str = "api"                                        # "api" (live screener) | "csv" (dropped file)
+    csv_file: str = "tradingview_screen.csv"                 # under data/raw/ when mode == "csv"
+    signal_column: str = ""                                  # CSV label column, e.g. "regime"
+    pass_values: list[str] = Field(default_factory=list)     # label values that count as "passes"
+    region: str = "america"
+    select: list[str] = Field(default_factory=list)          # carried indicators
+    filters: list[dict] = Field(default_factory=list)        # {field, op, value}
+    cache_ttl_minutes: int = 1440                            # EOD-flavored snapshot
+    max_results: int = 20000
+    divergence_strong_pctile: float = 0.70                   # cut on PURE composite
+    sessionid: str | None = None                            # realtime needs your own
+
+
 class AppConfig(BaseModel):
     edgar: EdgarConfig
     cache: CacheConfig = Field(default_factory=CacheConfig)
@@ -67,6 +86,7 @@ class AppConfig(BaseModel):
     valuation: ValuationConfig = Field(default_factory=ValuationConfig)
     spinoffs: SpinoffsConfig = Field(default_factory=SpinoffsConfig)
     tastytrade: TastytradeConfig = Field(default_factory=TastytradeConfig)
+    tradingview: TradingViewConfig = Field(default_factory=TradingViewConfig)
     peers: dict[str, list[str]] = Field(default_factory=dict)
     test_tickers: list[str] = Field(default_factory=list)
 

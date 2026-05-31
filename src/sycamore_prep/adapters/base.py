@@ -31,6 +31,10 @@ FINANCIALS_COLUMNS_REQUIRED = [
     "value", "unit", "source",
 ]
 
+# Minimum columns a TechnicalScreenProvider must return. Carried indicator
+# columns (RSI, SMA200, ...) are provider/config-specific and ride alongside.
+TECHNICAL_COLUMNS_REQUIRED = ["ticker", "passes_screen", "asof", "source"]
+
 
 @dataclass(frozen=True)
 class CompanyMeta:
@@ -162,6 +166,28 @@ class FilingsProvider(ABC):
         use_cache: bool = True,
     ) -> pd.DataFrame:
         """Full-text-search filings market-wide. Columns: SEARCH_COLUMNS."""
+
+
+class TechnicalScreenProvider(ABC):
+    """Non-primary technical overlay (e.g. a saved TradingView screen).
+
+    CONTEXT only: the result is overlaid beside the fundamental output and must
+    NEVER enter the three-attribute score, composite, or rank (CLAUDE.md:
+    bottom-up only, downside-first). Every row carries a non-primary `source`.
+    """
+
+    name: str = "base"
+
+    @abstractmethod
+    def get_screen(
+        self, tickers: Iterable[str] | None = None, refresh: bool = False
+    ) -> pd.DataFrame:
+        """Return a tidy frame — one row per ticker the screen evaluated — with
+        at least `TECHNICAL_COLUMNS_REQUIRED` columns plus any carried indicator
+        columns. `tickers` is the candidate set — providers that compute
+        per-ticker (e.g. the trend proxy) use it; set-based providers (live
+        screener, CSV) may ignore it. `refresh=True` bypasses any cache.
+        """
 
 
 # Canonical schema for the tidy volatility frame every VolatilityProvider

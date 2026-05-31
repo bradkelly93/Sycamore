@@ -137,3 +137,38 @@ def save_volatility(ticker: str, df: pd.DataFrame) -> Path:
             df = pd.concat([prev, df], ignore_index=True)
     df.to_parquet(p, index=False)
     return p
+
+
+# --- TradingView technical-screen overlay (non-primary, time-sensitive) ---
+# A single whole-screen snapshot, not ticker-keyed: it is one point-in-time pull
+# of the user's saved screen. Cached with an `asof` timestamp + TTL because
+# technicals go stale fast (unlike the rarely-changing primary fundamentals).
+
+def tv_screen_path() -> Path:
+    return cache_dir() / "tv_screen.parquet"
+
+
+def save_tv_screen(df: pd.DataFrame) -> Path:
+    p = tv_screen_path()
+    df.to_parquet(p, index=False)
+    return p
+
+
+def load_tv_screen(ttl_minutes: int) -> pd.DataFrame | None:
+    """Return the cached screen only if it is younger than `ttl_minutes`."""
+    p = tv_screen_path()
+    if not p.exists():
+        return None
+    df = pd.read_parquet(p)
+    if df.empty or "asof" not in df.columns:
+        return None
+    try:
+        asof = pd.Timestamp(df["asof"].iloc[0])
+    except Exception:  # noqa: BLE001
+        return None
+    if asof.tzinfo is None:
+        asof = asof.tz_localize("UTC")
+    age_min = (pd.Timestamp.now(tz="UTC") - asof).total_seconds() / 60.0
+    if age_min > ttl_minutes:
+        return None
+    return df
