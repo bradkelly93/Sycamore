@@ -8,10 +8,13 @@ used purely as an authenticated gateway to the `market-metrics` feed.
 
 AUTH (OAuth2). tastytrade discontinued username/password session-tokens on
 2025-12-01, so this uses OAuth2. One-time setup in your tastytrade account:
-  1. "OAuth Applications" -> create an app -> save the CLIENT SECRET.
-  2. "Manage" -> "Create Grant" -> save the REFRESH TOKEN (it never expires).
-Then put them in the ENVIRONMENT (never config.yaml, which is committed):
+  1. "OAuth Applications" -> create an app -> save the CLIENT ID + CLIENT SECRET.
+  2. "Manage" -> "Create Grant" -> save the REFRESH TOKEN (generate ONCE;
+     re-creating revokes the prior grant).
+Then put all three (from the SAME app) in the ENVIRONMENT (never config.yaml,
+which is committed):
 
+    export TASTYTRADE_CLIENT_ID=...
     export TASTYTRADE_CLIENT_SECRET=...
     export TASTYTRADE_REFRESH_TOKEN=...
 
