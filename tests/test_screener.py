@@ -18,10 +18,35 @@ from sycamore_prep.config import load_config
 from sycamore_prep.screener import run_screener
 from sycamore_prep.screener import screen as screen_mod
 from sycamore_prep.screener.scoring import score_universe
-from sycamore_prep.screener.screen import _tv_divergence, _tv_provider
+from sycamore_prep.screener.screen import _cagr, _tv_divergence, _tv_provider
 
 
 FIXTURE_DIR = Path(__file__).parent / "fixtures"
+
+
+def test_cagr_happy_path():
+    # 100 -> 133.1 over 3 years = 10% CAGR.
+    s = pd.Series([100.0, 110.0, 121.0, 133.1])
+    assert _cagr(s, 3) == pytest.approx(0.10, abs=1e-9)
+
+
+def test_cagr_returns_none_for_nonpositive_endpoints_without_warning():
+    """A non-positive start OR end (a swing into a loss year) makes the
+    fractional power undefined in the reals. _cagr must return None cleanly —
+    no NaN, and crucially no 'invalid value encountered in scalar power'
+    RuntimeWarning (the pipeline screens thousands of names; warning spam there
+    was the symptom this guards)."""
+    import warnings
+
+    with warnings.catch_warnings():
+        warnings.simplefilter("error")          # any RuntimeWarning -> test failure
+        assert _cagr(pd.Series([-5.0, 1.0, 2.0, 4.0]), 3) is None   # negative start
+        assert _cagr(pd.Series([5.0, 4.0, 2.0, -1.0]), 3) is None   # negative end
+        assert _cagr(pd.Series([0.0, 1.0, 2.0, 4.0]), 3) is None    # zero start
+
+
+def test_cagr_returns_none_when_history_too_short():
+    assert _cagr(pd.Series([100.0, 110.0]), 3) is None
 
 
 def test_scoring_directions_are_correct():

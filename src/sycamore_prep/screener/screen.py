@@ -127,7 +127,11 @@ def _cagr(series: pd.Series, years: int) -> float | None:
         return None
     start = s.iloc[-(years + 1)]
     end = s.iloc[-1]
-    if start <= 0 or pd.isna(start) or pd.isna(end):
+    # A CAGR is only defined for two positive endpoints. A non-positive start
+    # OR end (e.g. a swing into a loss year) makes the ratio's fractional power
+    # undefined in the reals — guard both so it returns None cleanly rather than
+    # producing a NaN + a "invalid value encountered in scalar power" warning.
+    if pd.isna(start) or pd.isna(end) or start <= 0 or end <= 0:
         return None
     return float((end / start) ** (1.0 / years) - 1.0)
 
