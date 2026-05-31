@@ -122,6 +122,13 @@ def build_universe(
         frames.append(_load_holdings_csv(iwn_path, "ishares-iwn"))
     if sycamore_path.exists():
         frames.append(_load_holdings_csv(sycamore_path, "sycamore-overlay"))
+    else:
+        # Committed Victory Sycamore fund holdings (Established Value + Small
+        # Company Opportunity) — the default overlay so the universe carries
+        # Sycamore's real names even without a manual data/raw drop.
+        from .sycamore import sycamore_holdings_path, sycamore_overlay_frame
+        if sycamore_holdings_path().exists():
+            frames.append(sycamore_overlay_frame())
 
     if not frames:
         raise FileNotFoundError(

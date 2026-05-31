@@ -43,6 +43,7 @@ from .viewmodels import (
     ScreenerRowView,
     ScreenerView,
     SpinoffsView,
+    SycamoreHoldingRow,
     UniverseView,
     VolPanelView,
     fig,
@@ -57,5 +58,5 @@ __all__ = [
     "Figure", "JobView", "MappingRowView", "MappingView", "NameWorkupView",
     "NormalizedView", "OverlayView", "PipelineRunRef", "PipelineView", "RankProof",
     "RankUnchangedClaim", "ScreenerRowView", "ScreenerView", "SpinoffsView",
-    "UniverseView", "VolPanelView", "fig",
+    "SycamoreHoldingRow", "UniverseView", "VolPanelView", "fig",
 ]

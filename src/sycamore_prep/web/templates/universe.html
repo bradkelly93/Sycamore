@@ -1,15 +1,53 @@
 {% extends "base.html" %}{% import "macros.html" as m %}
 {% block content %}
 <h1>Universe</h1>
+
 {% if view.built %}
-  <p><span class="big">{{ view.count }}</span> names · <strong>{{ view.sycamore_owned }}</strong> Sycamore-owned</p>
-  <h2>Source breakdown</h2>
-  <table>
-    <tr><th>Source</th><th>Count</th></tr>
-    {% for k, v in view.source_breakdown.items() %}<tr><td>{{ k }}</td><td>{{ v }}</td></tr>{% endfor %}
-  </table>
+  <p><span class="big">{{ view.count }}</span> investable names ·
+     <strong>{{ view.sycamore_owned }}</strong> Sycamore-owned</p>
+  <div style="display:flex; gap:30px; flex-wrap:wrap;">
+    <div>
+      <h3>By source</h3>
+      <table>{% for k, v in view.source_breakdown.items() %}<tr><td>{{ k }}</td><td>{{ v }}</td></tr>{% endfor %}</table>
+    </div>
+    <div>
+      <h3>By GICS sector</h3>
+      <table>{% for k, v in view.sector_breakdown.items() %}<tr><td>{{ k }}</td><td>{{ v }}</td></tr>{% endfor %}</table>
+    </div>
+  </div>
   <p>{{ m.download(view.csv_artifact, "universe.csv") }}</p>
 {% else %}
   <div class="note">{{ view.instructions }}</div>
+{% endif %}
+
+<h2>Victory Sycamore fund holdings</h2>
+{% if view.sycamore_note %}<div class="note">{{ view.sycamore_note }}</div>{% endif %}
+{% if view.sycamore_holdings %}
+  <p class="muted">Disclosed holdings used as the Sycamore overlay (not a live EDGAR pull — source-tagged accordingly).</p>
+  <div style="display:flex; gap:30px; flex-wrap:wrap;">
+    <div>
+      <h3>By fund</h3>
+      <table>{% for k, v in view.sycamore_funds.items() %}<tr><td>{{ k }}</td><td>{{ v }}</td></tr>{% endfor %}</table>
+    </div>
+    <div>
+      <h3>By sector</h3>
+      <table>{% for k, v in view.sycamore_sectors.items() %}<tr><td>{{ k }}</td><td>{{ v }}</td></tr>{% endfor %}</table>
+    </div>
+  </div>
+
+  <h3>Holdings ({{ view.sycamore_holdings | length }})</h3>
+  <table>
+    <tr><th>Fund</th><th>Ticker</th><th>Company</th><th>Sector</th><th>Weight</th><th>Position $</th></tr>
+    {% for h in view.sycamore_holdings %}
+    <tr>
+      <td class="muted">{{ 'EV' if 'Established' in (h.fund or '') else ('SCO' if 'Small' in (h.fund or '') else (h.fund or '')) }}</td>
+      <td><a href="/workup/{{ h.ticker }}">{{ h.ticker }}</a></td>
+      <td>{{ h.name or '' }}</td>
+      <td>{{ h.gics_sector or '' }}</td>
+      <td>{{ m.figure(h.weight_pct) }}</td>
+      <td>{{ m.figure(h.position_value) }}</td>
+    </tr>
+    {% endfor %}
+  </table>
 {% endif %}
 {% endblock %}

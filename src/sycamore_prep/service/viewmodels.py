@@ -311,13 +311,28 @@ class MappingView(BaseModel):
 # --------------------------------------------------------------------------- #
 # Universe / creds / jobs
 # --------------------------------------------------------------------------- #
+class SycamoreHoldingRow(BaseModel):
+    fund: str | None = None
+    ticker: str
+    name: str | None = None
+    gics_sector: str | None = None
+    weight_pct: Figure | None = None
+    position_value: Figure | None = None
+
+
 class UniverseView(BaseModel):
     built: bool = False
     count: int = 0
     source_breakdown: dict[str, int] = Field(default_factory=dict)
+    sector_breakdown: dict[str, int] = Field(default_factory=dict)
     sycamore_owned: int = 0
     instructions: str | None = None
     csv_artifact: ArtifactRef | None = None
+    # Sycamore fund holdings (the overlay) — available even before a build.
+    sycamore_funds: dict[str, int] = Field(default_factory=dict)
+    sycamore_sectors: dict[str, int] = Field(default_factory=dict)
+    sycamore_holdings: list[SycamoreHoldingRow] = Field(default_factory=list)
+    sycamore_note: str | None = None
 
 
 class SpinoffsView(BaseModel):

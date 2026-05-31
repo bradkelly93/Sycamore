@@ -126,16 +126,45 @@ def _tickers():
 def page_universe():
     st.header("Universe")
     v = service.universe.status()
-    if not v.built:
+    if v.built:
+        a, b = st.columns(2)
+        a.metric("Investable names", v.count)
+        b.metric("Sycamore-owned", v.sycamore_owned)
+        c1, c2 = st.columns(2)
+        with c1:
+            st.subheader("By source")
+            st.dataframe(pd.DataFrame([{"source": k, "count": n} for k, n in v.source_breakdown.items()]),
+                         hide_index=True)
+        with c2:
+            st.subheader("By GICS sector")
+            st.dataframe(pd.DataFrame([{"sector": k, "count": n} for k, n in v.sector_breakdown.items()]),
+                         hide_index=True)
+        download_fig(v.csv_artifact, "universe.csv")
+    else:
         st.info(v.instructions)
-        return
-    a, b = st.columns(2)
-    a.metric("Names", v.count)
-    b.metric("Sycamore-owned", v.sycamore_owned)
-    st.subheader("Source breakdown")
-    st.dataframe(pd.DataFrame(
-        [{"source": k, "count": n} for k, n in v.source_breakdown.items()]), hide_index=True)
-    download_fig(v.csv_artifact, "universe.csv")
+
+    st.subheader("Victory Sycamore fund holdings")
+    if v.sycamore_note:
+        st.info(v.sycamore_note)
+    if v.sycamore_holdings:
+        st.caption("Disclosed holdings used as the Sycamore overlay (not a live EDGAR pull — "
+                   "source-tagged accordingly).")
+        c1, c2 = st.columns(2)
+        with c1:
+            st.dataframe(pd.DataFrame([{"fund": k, "holdings": n} for k, n in v.sycamore_funds.items()]),
+                         hide_index=True)
+        with c2:
+            st.dataframe(pd.DataFrame([{"sector": k, "holdings": n} for k, n in v.sycamore_sectors.items()]),
+                         hide_index=True)
+        st.dataframe(pd.DataFrame([{
+            "Fund": h.fund, "Ticker": h.ticker, "Company": h.name, "Sector": h.gics_sector,
+            "Weight": (h.weight_pct.value if h.weight_pct else None),
+            "Position $": (h.position_value.value if h.position_value else None),
+        } for h in v.sycamore_holdings]), hide_index=True, column_config={
+            "Weight": st.column_config.NumberColumn(format="percent",
+                                                    help="victory sycamore funds (disclosed holdings)"),
+            "Position $": st.column_config.NumberColumn(format="dollar"),
+        })
 
 
 def page_screener():
