@@ -15,6 +15,13 @@ pip install -e ".[dev]"
 Then edit `config.yaml` and set a real contact string in `edgar.user_agent`
 — the SEC rejects requests without one.
 
+Sanity-check the resolved config + paths (User-Agent, cache dir, configured
+peers, Polymarket endpoint) before running anything that hits the network:
+
+```bash
+sycamore-prep config-check
+```
+
 ## CLI
 
 The toolkit ships a single `sycamore-prep` command (typer). Run
@@ -52,7 +59,15 @@ Outputs:
 - `data/cache/universe.csv` (human-readable)
 
 The universe table includes `in_iws`, `in_iwn`, `owned_by_sycamore` flags and
-a `source` column on every row.
+a `source` column on every row. See `data/raw/HOLDINGS.md` for the exact
+columns each holdings CSV must contain.
+
+Inspect the cached universe (optionally only the Sycamore-owned overlay):
+
+```bash
+sycamore-prep show-universe --n 20
+sycamore-prep show-universe --sycamore-only
+```
 
 ## Project layout
 
