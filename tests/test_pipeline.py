@@ -72,10 +72,45 @@ def test_shortlist_excludes_flagged_unless_kept():
 def test_derive_peers_nearest_market_cap_in_sector():
     uni = _universe()
     # AAA (2.0bn industrials): BBB (2.2bn) is nearer than CCC (8bn); DDD is financials.
-    peers = pl.derive_peers(uni, "AAA", k=5)
+    peers, source = pl.derive_peers(uni, "AAA", k=5)
+    assert source == "sector"          # no sic_of → sector+mcap fallback
     assert peers[0] == "BBB"
     assert "DDD" not in peers
     assert set(peers) <= {"BBB", "CCC"}
+
+
+def test_derive_peers_narrows_to_sic_group_when_available():
+    """With a sic_of lookup, peers narrow to the subject's 2-digit SIC group —
+    so a same-sector but different-business-model name is excluded even if its
+    market cap is closer. (Mirrors the real CAR-got-shippers problem.)"""
+    uni = _universe()  # AAA, BBB, CCC all Industrials
+    # AAA is SIC 75xx (auto rental); BBB + CCC are 75xx too; add a 42xx trucking
+    # name that's the NEAREST in market cap but a different business model.
+    uni = pd.concat([uni, pd.DataFrame([
+        {"ticker": "TRK", "name": "Trucking Co", "gics_sector": "Industrials",
+         "market_cap": 2010 * _M, "owned_by_sycamore": False},
+    ])], ignore_index=True)
+    sic = {"AAA": "7510", "BBB": "7513", "CCC": "7512", "TRK": "4213"}
+    peers, source = pl.derive_peers(uni, "AAA", k=5, sic_of=lambda t: sic.get(t))
+    assert source == "sic"
+    assert "TRK" not in peers           # nearest mcap, but wrong SIC group → excluded
+    assert set(peers) <= {"BBB", "CCC"}
+
+
+def test_derive_peers_falls_back_to_sector_when_sic_group_too_thin():
+    uni = _universe()
+    # Only AAA is 75xx; everyone else differs → <2 same-group peers → fall back.
+    sic = {"AAA": "7510", "BBB": "3559", "CCC": "2834"}
+    peers, source = pl.derive_peers(uni, "AAA", k=5, sic_of=lambda t: sic.get(t))
+    assert source == "sector"
+    assert peers                        # still returns a (sector) peer set, never empty
+
+
+def test_derive_peers_falls_back_when_sic_lookup_returns_none():
+    uni = _universe()
+    peers, source = pl.derive_peers(uni, "AAA", k=5, sic_of=lambda t: None)
+    assert source == "sector"
+    assert peers
 
 
 # --------------------------------------------------------------------------- #
@@ -107,6 +142,8 @@ def stubbed(tmp_path, monkeypatch):
     monkeypatch.setattr(pl, "run_comps", fake_run_comps)
     monkeypatch.setattr(pl, "build_models", fake_build_models)
     monkeypatch.setattr(pl, "cache_dir", lambda: tmp_path)
+    # SIC-aware peer derivation calls EdgarProvider().get_sic — stub it offline.
+    monkeypatch.setattr(pl.EdgarProvider, "get_sic", lambda self, t, **kw: None)
     return tmp_path
 
 

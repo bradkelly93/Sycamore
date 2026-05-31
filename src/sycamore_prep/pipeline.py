@@ -26,6 +26,7 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
+from .adapters import EdgarProvider
 from .comps import run_comps
 from .comps.report import _df_to_sheet, _safe
 from .config import cache_dir, load_config
@@ -55,6 +56,7 @@ class Dossier:
     is_bank: bool = False
     recent_spinoff: bool = False
     peers_used: str = ""
+    peers_source: str = ""   # "config" | "sic" | "sector" — how peers were chosen
     dossier_dir: str = ""
     error: str | None = None
 
@@ -95,27 +97,67 @@ def shortlist_from_screen(screened: pd.DataFrame, top: int, keep_flagged: bool) 
     return [str(t) for t in df.index[:top]]
 
 
-def derive_peers(uni: pd.DataFrame | None, ticker: str, k: int = DEFAULT_PEER_K) -> list[str]:
-    """Peers = same GICS sector, nearest market cap (log distance). Empty if the
-    ticker/sector isn't in the universe."""
+_MIN_SIC_PEERS = 2   # below this, the SIC group is too thin → fall back to sector
+
+
+def _sic_group(sic: str | None) -> str | None:
+    """2-digit SIC major group (e.g. '7510' → '75'). The major group is the
+    right granularity for peers: the full 4-digit code is often too narrow to
+    populate a comp set, while the 2-digit group cleanly separates business
+    models a GICS sector lumps together (auto rental '75' vs. trucking '42'
+    vs. metal fabrication '34', all 'Industrials')."""
+    if not sic:
+        return None
+    s = str(sic).strip()
+    return s[:2] if len(s) >= 2 and s[:2].isdigit() else None
+
+
+def derive_peers(
+    uni: pd.DataFrame | None,
+    ticker: str,
+    k: int = DEFAULT_PEER_K,
+    sic_of=None,
+) -> tuple[list[str], str]:
+    """Derive a peer set from the universe. Returns ``(peers, source)`` where
+    source is ``"sic"`` (narrowed to the subject's 2-digit SIC major group) or
+    ``"sector"`` (sector + nearest market cap, the fallback).
+
+    ``sic_of`` is an optional ``ticker -> sic|None`` lookup (injected by the
+    pipeline, backed by EdgarProvider.get_sic). Kept optional + injected so this
+    function stays pure and offline-testable. SIC narrowing applies only when
+    the lookup yields the subject's group AND ≥``_MIN_SIC_PEERS`` same-group
+    candidates; otherwise it falls back to the original sector+mcap behavior so
+    a missing/blocked SIC never produces an empty peer set."""
     if uni is None or uni.empty or "gics_sector" not in uni.columns:
-        return []
+        return [], "sector"
     u = uni.copy()
     u["ticker"] = u["ticker"].astype(str).str.upper()
     row = u[u["ticker"] == ticker.upper()]
     if row.empty:
-        return []
+        return [], "sector"
     sector = row.iloc[0]["gics_sector"]
     mcap = row.iloc[0].get("market_cap", np.nan)
     pool = u[(u["gics_sector"] == sector) & (u["ticker"] != ticker.upper())].copy()
-    pool = pool[pool["market_cap"].notna()] if "market_cap" in pool.columns else pool
+    if "market_cap" in pool.columns:
+        pool = pool[pool["market_cap"].notna()]
     if pool.empty:
-        return []
+        return [], "sector"
+
+    # Optionally narrow to the subject's SIC major group (same business model).
+    source = "sector"
+    if sic_of is not None:
+        subj_grp = _sic_group(sic_of(ticker.upper()))
+        if subj_grp is not None:
+            pool["_sic_grp"] = pool["ticker"].map(lambda t: _sic_group(sic_of(t)))
+            narrowed = pool[pool["_sic_grp"] == subj_grp]
+            if len(narrowed) >= _MIN_SIC_PEERS:
+                pool, source = narrowed, "sic"
+
     if pd.isna(mcap) or mcap <= 0:
-        return pool["ticker"].head(k).tolist()
+        return pool["ticker"].head(k).tolist(), source
     pool = pool[pool["market_cap"] > 0]
-    pool["_dist"] = (np.log(pool["market_cap"]) - np.log(float(mcap))).abs()
-    return pool.sort_values("_dist")["ticker"].head(k).tolist()
+    pool = pool.assign(_dist=(np.log(pool["market_cap"]) - np.log(float(mcap))).abs())
+    return pool.sort_values("_dist")["ticker"].head(k).tolist(), source
 
 
 def _index_frame(dossiers: list[Dossier]) -> pd.DataFrame:
@@ -124,7 +166,7 @@ def _index_frame(dossiers: list[Dossier]) -> pd.DataFrame:
             "composite_rank", "q1_quality_score", "q2_valuation_score",
             "q3_improving_score", "margin_of_safety_base", "implied_growth_base",
             "trough_pe", "ns_flags", "is_bank", "recent_spinoff",
-            "peers_used", "dossier_dir", "error"]
+            "peers_used", "peers_source", "dossier_dir", "error"]
     df = pd.DataFrame([{c: getattr(d, c) for c in cols} for d in dossiers])
     if not df.empty:
         df = df.sort_values("composite_rank", na_position="last").set_index("ticker")
@@ -255,6 +297,10 @@ def run_pipeline(
     cfg = load_config()
     screened, shortlist, uni = _select(tickers, sector, sycamore_only, top, skip_market_cap)
 
+    # Backs SIC-aware peer derivation (get_sic reads the cached submissions JSON;
+    # offline if already pulled). Created once and reused across the shortlist.
+    edgar = EdgarProvider()
+
     spin_tickers = _recent_spinoff_tickers(refresh) if link_spinoffs else set()
 
     stamp = datetime.now().strftime("%Y%m%d_%H%M%S")
@@ -276,8 +322,10 @@ def run_pipeline(
         d.dossier_dir = tk
         try:
             peers = list(cfg.peers.get(tk, []))
-            if not peers and auto_peers:
-                peers = derive_peers(uni, tk)
+            if peers:
+                d.peers_source = "config"
+            elif auto_peers:
+                peers, d.peers_source = derive_peers(uni, tk, sic_of=edgar.get_sic)
             d.peers_used = ", ".join(peers)
             comps = run_comps(
                 tk, peers or None, wacc=wacc, terminal_growth=terminal_growth,

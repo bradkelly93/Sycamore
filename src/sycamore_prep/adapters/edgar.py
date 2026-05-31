@@ -174,6 +174,30 @@ class EdgarProvider(FundamentalsProvider, FilingsProvider):
         cik, name = self._resolve(ticker)
         return CompanyMeta(ticker=ticker.upper(), cik=cik, name=name, source=SOURCE_TAG)
 
+    def get_sic(self, ticker_or_cik: str, *, use_cache: bool = True) -> str | None:
+        """The filer's 4-digit SIC code from the submissions JSON (root `sic`).
+
+        The submissions payload is cached as JSON, so a repeat call is offline.
+        Returns None if unavailable (no network, unknown filer, missing field) —
+        callers treat None as "no industry signal" and fall back. Used by the
+        pipeline's peer derivation to group same-industry comps (a coarse GICS
+        sector alone matches a car-rental co to shippers; SIC separates them)."""
+        try:
+            cik, _ = self._to_cik(ticker_or_cik)
+        except Exception:  # noqa: BLE001 — unknown ticker → no SIC signal
+            return None
+        key = f"submissions_{cik}"
+        raw = cache.load_json(key) if use_cache else None
+        if raw is None:
+            try:
+                raw = self._get(f"{self._base}/submissions/CIK{cik}.json")
+                cache.save_json(key, raw)
+            except Exception:  # noqa: BLE001 — network/egress failure → no signal
+                return None
+        sic = (raw or {}).get("sic")
+        sic = str(sic).strip() if sic not in (None, "") else None
+        return sic or None
+
     def get_financials(
         self,
         ticker: str,
