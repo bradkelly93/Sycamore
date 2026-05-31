@@ -7,7 +7,7 @@ from pathlib import Path
 import pandas as pd
 import pytest
 
-from sycamore_prep.universe import builder
+from sycamore_prep.universe import builder, sycamore
 
 
 IWS_CSV = """\
@@ -84,6 +84,8 @@ def test_build_universe_skips_missing_files(tmp_path: Path, monkeypatch):
     cache.mkdir()
     monkeypatch.setattr(builder, "raw_dir", lambda: raw)
     monkeypatch.setattr(builder, "cache_dir", lambda: cache)
+    # Isolate the data/raw skip logic from the committed Sycamore default overlay.
+    monkeypatch.setattr(sycamore, "sycamore_holdings_path", lambda: tmp_path / "no_sycamore.csv")
 
     df = builder.build_universe()
     assert int(df["in_iws"].sum()) == 2

@@ -8,9 +8,11 @@ from sycamore_prep.service import universe as svc
 from sycamore_prep.service.viewmodels import Figure
 
 
-def test_status_surfaces_sycamore_holdings(wl_root):
-    # wl_root points cache_dir at an empty tmp -> universe not built, but the
-    # committed Sycamore holdings still populate the overlay section.
+def test_status_surfaces_sycamore_holdings(wl_root, monkeypatch):
+    # Force "not built" deterministically (load_universe reads the builder's real
+    # cache, which wl_root doesn't redirect); the committed Sycamore holdings must
+    # still populate the overlay section regardless.
+    monkeypatch.setattr(svc, "load_universe", lambda: None)
     v = svc.status()
     assert v.built is False
     assert v.sycamore_funds.get("Established Value Fund") == 72

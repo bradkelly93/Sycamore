@@ -126,9 +126,9 @@ def build_universe(
         # Committed Victory Sycamore fund holdings (Established Value + Small
         # Company Opportunity) — the default overlay so the universe carries
         # Sycamore's real names even without a manual data/raw drop.
-        from .sycamore import sycamore_holdings_path, sycamore_overlay_frame
-        if sycamore_holdings_path().exists():
-            frames.append(sycamore_overlay_frame())
+        from . import sycamore
+        if sycamore.sycamore_holdings_path().exists():
+            frames.append(sycamore.sycamore_overlay_frame())
 
     if not frames:
         raise FileNotFoundError(
