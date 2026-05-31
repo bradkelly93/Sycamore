@@ -2,12 +2,13 @@
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from pathlib import Path
 
 import pandas as pd
 import typer
 
-from .adapters import EdgarProvider, PolymarketProvider
+from .adapters import EdgarProvider, PolymarketProvider, YFinanceProvider
 from .config import cache_dir, load_config
 from .prediction_markets import (
     build_overlay,
@@ -156,15 +157,32 @@ def screen_cmd(
 
 
 def _resolve_overlay_targets(
-    tickers: list[str] | None, universe: bool, limit: int | None
+    tickers: list[str] | None,
+    universe: bool,
+    limit: int | None,
+    sector_resolver: Callable[[str], str | None] | None = None,
 ) -> list[tuple[str, str, str | None]]:
-    """Return [(ticker, name, gics_sector)] for discovery."""
+    """Return [(ticker, name, gics_sector)] for discovery.
+
+    Universe rows already carry `gics_sector`. For explicitly typed tickers (or
+    the config `test_tickers` fallback) the sector isn't known up front; when a
+    `sector_resolver` is supplied it's looked up so sector-scoped macro/industry
+    markets read through on explicit-ticker runs, not just `--universe`.
+    Resolution failures degrade to None (same as before)."""
+    def _sector(t: str) -> str | None:
+        if sector_resolver is None:
+            return None
+        try:
+            return sector_resolver(t)
+        except Exception:  # noqa: BLE001 — sector lookup is best-effort
+            return None
+
     if tickers:
-        return [(t.upper(), t.upper(), None) for t in tickers]
+        return [(t.upper(), t.upper(), _sector(t.upper())) for t in tickers]
     df = load_universe() if universe else None
     if df is None:
         cfg = load_config()
-        return [(t, t, None) for t in cfg.test_tickers]
+        return [(t, t, _sector(t)) for t in cfg.test_tickers]
     if limit:
         df = df.head(limit)
     return [
@@ -200,8 +218,18 @@ def prediction_discover(
     aps = [a.strip().lower() for a in apertures.split(",") if a.strip()]
     minrel = min_relevance if min_relevance is not None else cfg.polymarket.min_relevance
 
+    # The industry + macro apertures read through a name's GICS sector. Universe
+    # rows already carry it; for typed tickers, resolve it via yfinance so those
+    # apertures fire on explicit-ticker runs too. Only build the resolver when a
+    # sector-dependent aperture is requested (avoids needless network calls).
+    sector_resolver = None
+    if {"industry", "macro"} & set(aps):
+        sector_resolver = YFinanceProvider().get_sector
+
     found: list[pd.DataFrame] = []
-    for ticker, name, sector in _resolve_overlay_targets(tickers, universe, limit):
+    for ticker, name, sector in _resolve_overlay_targets(
+        tickers, universe, limit, sector_resolver
+    ):
         try:
             cands = discover_for_ticker(
                 provider, ticker, name, sector, cfg, apertures=aps, min_relevance=minrel

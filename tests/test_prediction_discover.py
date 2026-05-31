@@ -322,6 +322,30 @@ def test_max_markets_per_query_zero_disables_cap():
     assert len(df) == 8  # no cap → all kept
 
 
+def test_resolve_overlay_targets_uses_sector_resolver_for_typed_tickers():
+    """Typed tickers carry no sector up front; when a resolver is supplied it's
+    looked up (so sector-scoped macro/industry markets fire on explicit-ticker
+    runs). A failing resolver degrades to None, never raises."""
+    from sycamore_prep.cli import _resolve_overlay_targets
+
+    resolver = {"WES": "Energy", "UMBF": "Financials"}.get
+    out = _resolve_overlay_targets(["wes", "umbf"], universe=False, limit=None,
+                                   sector_resolver=resolver)
+    assert out == [("WES", "WES", "Energy"), ("UMBF", "UMBF", "Financials")]
+
+    # No resolver → sector stays None (prior behavior preserved).
+    assert _resolve_overlay_targets(["WES"], universe=False, limit=None) == [
+        ("WES", "WES", None)
+    ]
+
+    # Resolver that raises is swallowed → None, not a crash.
+    def boom(_t):
+        raise RuntimeError("yfinance down")
+
+    assert _resolve_overlay_targets(["WES"], universe=False, limit=None,
+                                    sector_resolver=boom) == [("WES", "WES", None)]
+
+
 def test_upsert_preserves_human_edits_and_adds_new_candidates():
     existing = pd.DataFrame([{
         "ticker": "SAVE", "aperture": "company", "slug": "save-ch11-2026",
