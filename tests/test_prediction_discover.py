@@ -375,3 +375,70 @@ def test_upsert_preserves_human_edits_and_adds_new_candidates():
 
     new = merged[merged["slug"] == "ual-merger-2026"].iloc[0]
     assert bool(new["confirmed"]) is False          # new candidate unconfirmed
+
+
+def test_upsert_prunes_stale_machine_rows_on_rediscovery():
+    """A re-discovery of a (ticker, aperture) pair drops machine-owned
+    (unconfirmed + un-noted) rows that are no longer in the fresh candidates —
+    e.g. near-dated markets the time-to-resolution filter now excludes."""
+    existing = pd.DataFrame([
+        {"ticker": "WES", "aperture": "industry", "slug": "wti-low-70-in-may",
+         "question": "WTI dip to $70 in May?", "event_type": "macro",
+         "direction": "neutral", "relevance_score": 0.6, "confirmed": False, "notes": ""},
+        {"ticker": "WES", "aperture": "industry", "slug": "recession-2026",
+         "question": "US recession by end 2026?", "event_type": "macro",
+         "direction": "risk", "relevance_score": 0.72, "confirmed": False, "notes": ""},
+    ])
+    # Re-discovery returns ONLY the longer-dated recession market.
+    candidates = pd.DataFrame([
+        {"ticker": "WES", "aperture": "industry", "slug": "recession-2026",
+         "question": "US recession by end 2026?", "event_type": "macro",
+         "direction": "risk", "relevance_score": 0.73},
+    ])
+    merged = upsert(existing, candidates)
+    slugs = set(merged["slug"])
+    assert "recession-2026" in slugs          # still discovered → kept + refreshed
+    assert "wti-low-70-in-may" not in slugs   # stale, machine-owned, gone → pruned
+
+
+def test_upsert_keeps_confirmed_and_noted_rows_even_when_stale():
+    """Pruning never touches a row the human confirmed or annotated, even if it
+    drops out of the fresh candidate set."""
+    existing = pd.DataFrame([
+        {"ticker": "WES", "aperture": "industry", "slug": "wti-confirmed",
+         "question": "WTI dip to $70 in May?", "event_type": "macro",
+         "direction": "risk", "relevance_score": 0.6, "confirmed": True, "notes": ""},
+        {"ticker": "WES", "aperture": "industry", "slug": "wti-noted",
+         "question": "WTI dip to $80 in May?", "event_type": "macro",
+         "direction": "neutral", "relevance_score": 0.6, "confirmed": False,
+         "notes": "revisit after June OPEC"},
+    ])
+    # Re-discovery of the same pair returns neither stale market.
+    candidates = pd.DataFrame([
+        {"ticker": "WES", "aperture": "industry", "slug": "recession-2026",
+         "question": "US recession by end 2026?", "event_type": "macro",
+         "direction": "risk", "relevance_score": 0.73},
+    ])
+    merged = upsert(existing, candidates)
+    slugs = set(merged["slug"])
+    assert "wti-confirmed" in slugs           # confirmed → never pruned
+    assert "wti-noted" in slugs               # human note → never pruned
+    assert "recession-2026" in slugs          # new candidate added
+
+
+def test_upsert_leaves_untouched_pairs_alone():
+    """A pair NOT re-discovered this run is left entirely intact (pruning only
+    applies to pairs the run actually refreshed)."""
+    existing = pd.DataFrame([
+        {"ticker": "CW", "aperture": "industry", "slug": "old-cw-market",
+         "question": "old", "event_type": "macro", "direction": "neutral",
+         "relevance_score": 0.5, "confirmed": False, "notes": ""},
+    ])
+    # Re-discovery touches only WES — CW's pair is untouched, so its row stays.
+    candidates = pd.DataFrame([
+        {"ticker": "WES", "aperture": "industry", "slug": "recession-2026",
+         "question": "US recession by end 2026?", "event_type": "macro",
+         "direction": "risk", "relevance_score": 0.73},
+    ])
+    merged = upsert(existing, candidates)
+    assert "old-cw-market" in set(merged["slug"])   # untouched pair → kept

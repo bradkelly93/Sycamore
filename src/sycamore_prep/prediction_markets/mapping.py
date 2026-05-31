@@ -81,35 +81,65 @@ def save_mapping(df: pd.DataFrame, path: Path | str | None = None) -> Path:
     return p
 
 
+def _is_machine_owned(row: dict) -> bool:
+    """True if a row is an untouched machine proposal — unconfirmed AND un-noted.
+    A human who cares about a row either confirms it or writes a note, so these
+    two flags are the safe signal that a row can be pruned on re-discovery.
+    (direction can't be the signal — the machine itself guesses risk/opportunity.)
+    """
+    return (not bool(row.get("confirmed"))) and _blank(row.get("notes"))
+
+
 def upsert(existing: pd.DataFrame, candidates: pd.DataFrame) -> pd.DataFrame:
     """Merge discovery candidates into the mapping on (ticker, slug).
 
     Human-owned fields (confirmed, notes, and any non-blank event_type/
     direction/aperture) are preserved; the machine fields relevance_score and
     question are refreshed. New candidates are appended as confirmed=False.
+
+    Self-pruning: when a (ticker, aperture) pair is re-discovered, existing
+    rows in that pair that are machine-owned (unconfirmed + un-noted) and NO
+    LONGER in the fresh candidate set are dropped — so a re-run clears stale
+    junk (e.g. near-dated markets the new time-to-resolution filter now
+    excludes) without ever touching a confirmed or annotated row.
     """
     base = (
         _with_defaults(existing)
         if existing is not None and not existing.empty
         else empty_mapping()
     )
-    records: dict[tuple[str, str], dict] = {
-        (str(r["ticker"]), str(r["slug"])): r.to_dict()
-        for _, r in base.iterrows()
-    }
-    if candidates is not None and not candidates.empty:
-        for _, c in _with_defaults(candidates).iterrows():
-            key = (str(c["ticker"]), str(c["slug"]))
-            if key in records:
-                row = records[key]
-                row["relevance_score"] = c["relevance_score"]
-                row["question"] = c["question"]
-                # Fill machine guesses only where the human left a blank.
-                for f in ("aperture", "event_type", "direction"):
-                    if _blank(row.get(f)):
-                        row[f] = c.get(f)
-            else:
-                row = c.to_dict()
-                row["confirmed"] = False  # new candidates start unconfirmed
-                records[key] = row
+    cand = _with_defaults(candidates) if candidates is not None and not candidates.empty \
+        else empty_mapping()
+
+    # (ticker, aperture) pairs that this discovery run actually refreshed, and
+    # the (ticker, slug) keys it returned — used to prune stale machine rows.
+    refreshed_pairs = {(str(c["ticker"]), str(c["aperture"])) for _, c in cand.iterrows()}
+    cand_keys = {(str(c["ticker"]), str(c["slug"])) for _, c in cand.iterrows()}
+
+    records: dict[tuple[str, str], dict] = {}
+    for _, r in base.iterrows():
+        row = r.to_dict()
+        key = (str(r["ticker"]), str(r["slug"]))
+        pair = (str(r["ticker"]), str(r["aperture"]))
+        # Drop a stale machine-owned row only when its pair was re-discovered
+        # AND it's absent from the fresh candidates. Confirmed/annotated rows
+        # and untouched pairs are always kept.
+        if pair in refreshed_pairs and key not in cand_keys and _is_machine_owned(row):
+            continue
+        records[key] = row
+
+    for _, c in cand.iterrows():
+        key = (str(c["ticker"]), str(c["slug"]))
+        if key in records:
+            row = records[key]
+            row["relevance_score"] = c["relevance_score"]
+            row["question"] = c["question"]
+            # Fill machine guesses only where the human left a blank.
+            for f in ("aperture", "event_type", "direction"):
+                if _blank(row.get(f)):
+                    row[f] = c.get(f)
+        else:
+            row = c.to_dict()
+            row["confirmed"] = False  # new candidates start unconfirmed
+            records[key] = row
     return pd.DataFrame(list(records.values()))[MAPPING_COLUMNS]
