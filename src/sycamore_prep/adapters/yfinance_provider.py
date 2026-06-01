@@ -127,6 +127,46 @@ class YFinanceProvider(PriceProvider):
             return None
         return _YF_TO_GICS_SECTOR.get(sector, sector)
 
+    def get_news(self, ticker: str, limit: int = 10) -> pd.DataFrame:
+        """Recent news headlines for a ticker (NON-PRIMARY, market-opinion).
+
+        Returns a tidy frame [title, publisher, link, published, ticker, source]
+        newest-first. Empty frame on any failure — yfinance news is flaky and its
+        field layout has changed between versions, so parsing is defensive. This
+        NEVER feeds the screener/score: it is context only (CLAUDE.md)."""
+        cols = ["title", "publisher", "link", "published", "ticker", "source"]
+        yf = _yf()
+        try:
+            raw = self._retry(lambda: yf.Ticker(_yf_symbol(ticker)).news)
+        except Exception:  # noqa: BLE001 — news is best-effort context, never fatal
+            return pd.DataFrame(columns=cols)
+        rows = []
+        for item in (raw or []):
+            if not isinstance(item, dict):
+                continue
+            # yfinance has shipped two shapes: a flat dict, and {id, content:{...}}.
+            c = item.get("content", item)
+            if not isinstance(c, dict):
+                c = item
+            title = c.get("title") or item.get("title")
+            if not title:
+                continue
+            link = None
+            for key in ("canonicalUrl", "clickThroughUrl"):
+                v = c.get(key)
+                if isinstance(v, dict) and v.get("url"):
+                    link = v["url"]
+                    break
+            link = link or item.get("link") or ""
+            prov = c.get("provider")
+            publisher = (prov.get("displayName") if isinstance(prov, dict) else None) or item.get("publisher") or ""
+            published = c.get("pubDate") or c.get("displayTime") or item.get("providerPublishTime")
+            rows.append({
+                "title": str(title), "publisher": str(publisher), "link": str(link),
+                "published": published, "ticker": ticker.upper(), "source": SOURCE_TAG,
+            })
+        return pd.DataFrame(rows, columns=cols).head(limit)
+
     def get_shares(self, ticker: str) -> float | None:
         yf = _yf()
         try:

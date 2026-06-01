@@ -21,6 +21,27 @@ before what you could make. Use it to decide whether the risk/reward is attracti
     <div class="muted" style="font-size:12px; margin-top:4px;">Assumes a {{ m.figure(view.wacc) }} discount rate and {{ m.figure(view.terminal_growth) }} long-run growth.</div>
   </div>
 
+  {% if view.swot %}
+  <h2>TL;DR — at a glance</h2>
+  <p class="lead" style="font-size:15px;"><b>{{ view.swot.headline }}</b></p>
+  <p class="lead">{{ view.swot.summary }}</p>
+  <p class="muted" style="font-size:12px; margin-top:-6px;">Built from this page's own figures (no AI guesswork) — every point traces to a number; hover the ● for its source.</p>
+  <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px;">
+    {% set blocks = [("Strengths", view.swot.strengths, "ok"), ("Weaknesses", view.swot.weaknesses, "warn"),
+                     ("Opportunities", view.swot.opportunities, "ok"), ("Threats", view.swot.threats, "risk")] %}
+    {% for title, items, tone in blocks %}
+    <div class="card {{ 'bad' if tone=='risk' }}">
+      <h4>{{ {'Strengths':'💪','Weaknesses':'⚠','Opportunities':'🎯','Threats':'🚩'}[title] }} {{ title }}</h4>
+      {% if items %}
+        <ul style="margin:6px 0 0; padding-left:18px;">
+          {% for it in items %}<li style="margin-bottom:3px;">{{ it.text }}{% if it.metric %} {{ m.src_dot(it.metric) }}{% endif %}</li>{% endfor %}
+        </ul>
+      {% else %}<p class="muted" style="margin:6px 0 0;">None flagged from the data.</p>{% endif %}
+    </div>
+    {% endfor %}
+  </div>
+  {% endif %}
+
   <h2>Three valuation scenarios</h2>
   <p class="lead">What the stock is worth if things go badly, normally, or well. We lead with the <b>downside case</b>.</p>
   <div class="grid3">
@@ -133,5 +154,13 @@ before what you could make. Use it to decide whether the risk/reward is attracti
   <p class="muted" style="font-size:12px;">The model is a rebuildable Excel scaffold with live formulas — by design the tool
     generates the file but never re-creates those formulas in the browser. Flex the bear column in Excel.</p>
   <div id="action-out"></div>
+
+  <div class="context">
+    <span class="tag">CONTEXT ONLY</span> &nbsp;<b>Recent headlines</b> — what the press is saying lately.
+    Background reading, never part of the valuation or the score.
+    <div hx-get="/workup/{{ ticker }}/news" hx-trigger="load" hx-swap="innerHTML" style="margin-top:8px;">
+      <span class="muted">Loading recent headlines…</span>
+    </div>
+  </div>
 {% endif %}
 {% endblock %}

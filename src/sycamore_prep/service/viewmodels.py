@@ -213,6 +213,42 @@ class NormalizedView(BaseModel):
     basis: str | None = None
 
 
+class SwotItem(BaseModel):
+    """One SWOT bullet, derived deterministically from a figure (auditable)."""
+
+    text: str
+    metric: Figure | None = None     # the number the bullet traces to
+
+
+class SwotView(BaseModel):
+    """At-a-glance SWOT + a plain-English TLDR, built from the deep-dive's own
+    numbers — no LLM, no guesswork. Downside-first: weaknesses + threats matter
+    at least as much as strengths + opportunities."""
+
+    headline: str = ""               # one-line verdict
+    summary: str = ""                # short plain-English paragraph
+    strengths: list[SwotItem] = Field(default_factory=list)
+    weaknesses: list[SwotItem] = Field(default_factory=list)
+    opportunities: list[SwotItem] = Field(default_factory=list)
+    threats: list[SwotItem] = Field(default_factory=list)
+
+
+class NewsItem(BaseModel):
+    title: str
+    publisher: str = ""
+    link: str = ""
+    published: str | None = None
+
+
+class NewsView(BaseModel):
+    """NON-PRIMARY recent-headlines panel. Context only — never feeds scoring."""
+
+    ticker: str
+    source: str = "yfinance (non-primary)"
+    items: list[NewsItem] = Field(default_factory=list)
+    note: str | None = None
+
+
 class NameWorkupView(BaseModel):
     ticker: str
     name: str | None = None
@@ -224,6 +260,7 @@ class NameWorkupView(BaseModel):
     # Headline downside numbers (rendered at top).
     base_margin_of_safety: Figure | None = None
     base_implied_growth: Figure | None = None
+    swot: SwotView | None = None
     dcf_cases: list[DcfCaseView] = Field(default_factory=list)   # ordered bear, base, bull
     normalized: NormalizedView | None = None
     bands: list[BandView] = Field(default_factory=list)

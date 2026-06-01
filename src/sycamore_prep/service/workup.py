@@ -24,6 +24,8 @@ from .viewmodels import (
     DcfCaseView,
     NameWorkupView,
     NormalizedView,
+    SwotItem,
+    SwotView,
     fig,
 )
 
@@ -115,6 +117,104 @@ def _vol_panel(ticker: str, price, mos_floor, with_vol: bool):
         return vol_panel_from_overlay(None, note=f"vol overlay skipped: {exc}")
 
 
+def _f(x):
+    """NaN-safe float (engine helpers return float('nan') for missing)."""
+    try:
+        return float(x) if x is not None and x == x else None
+    except (TypeError, ValueError):
+        return None
+
+
+def _build_swot(s, base_mos, bands) -> SwotView:
+    """Derive a SWOT + plain-English TLDR deterministically from the deep-dive's
+    own figures. Every bullet carries the number it traces to (auditable, no LLM).
+    Downside-first: weaknesses/threats are assessed as carefully as strengths."""
+    q = s.quality or {}
+    roic, fcfm, lev = _f(q.get("roic")), _f(q.get("fcf_margin")), _f(q.get("net_debt_ebitda"))
+    mos, ig = _f(base_mos), _f(s.base_implied_growth())
+    trough_pe = _f(s.normalized.trough_pe) if s.normalized else None
+
+    S, W, O, T = [], [], [], []
+
+    # Quality -> Strengths / Weaknesses (high returns + low leverage = better business)
+    if roic is not None:
+        item = SwotItem(text=f"Strong returns on capital ({roic*100:.0f}%)" if roic >= 0.12
+                        else f"Modest returns on capital ({roic*100:.0f}%)",
+                        metric=fig(roic, EDGAR, fmt="pct"))
+        (S if roic >= 0.12 else W).append(item)
+    if fcfm is not None and fcfm >= 0.10:
+        S.append(SwotItem(text=f"Healthy free-cash-flow margin ({fcfm*100:.0f}%)", metric=fig(fcfm, EDGAR, fmt="pct")))
+    elif fcfm is not None and fcfm < 0.05:
+        W.append(SwotItem(text=f"Thin free-cash-flow margin ({fcfm*100:.0f}%)", metric=fig(fcfm, EDGAR, fmt="pct")))
+    if lev is not None:
+        if lev <= 1.5:
+            S.append(SwotItem(text=f"Conservative balance sheet ({lev:.1f}× net debt/EBITDA)",
+                              metric=fig(lev, EDGAR, fmt="mult")))
+        elif lev > 3:
+            W.append(SwotItem(text=f"Elevated leverage ({lev:.1f}× net debt/EBITDA)",
+                              metric=fig(lev, EDGAR, fmt="mult", flag="warn")))
+
+    # Valuation -> Opportunities (cheap vs fair value / own history)
+    if mos is not None and mos > 0.15:
+        O.append(SwotItem(text=f"Trades at a {mos*100:.0f}% margin of safety to estimated fair value",
+                          metric=fig(mos, MIXED, fmt="pct")))
+    if ig is not None and ig < 0.03:
+        O.append(SwotItem(text=f"Low expectations baked in — market prices only {ig*100:.1f}% growth",
+                          metric=fig(ig, MIXED, fmt="pct")))
+    cheap = [b for b in bands if _f(b.percentile_cheap.value if b.percentile_cheap else None) is not None
+             and _f(b.percentile_cheap.value) >= 70]
+    if cheap:
+        b = cheap[0]
+        O.append(SwotItem(text=f"Cheap vs. its own history on {b.multiple} "
+                               f"({_f(b.percentile_cheap.value):.0f}th cheapness percentile)",
+                          metric=b.percentile_cheap))
+
+    # Downside -> Threats (negative MoS, priced for perfection, downturn pain)
+    if mos is not None and mos < 0:
+        T.append(SwotItem(text=f"Trades {abs(mos)*100:.0f}% ABOVE estimated fair value — no cushion",
+                          metric=fig(mos, MIXED, fmt="pct", flag="risk")))
+    if ig is not None and ig > 0.08:
+        T.append(SwotItem(text=f"Priced for {ig*100:.1f}% growth — demanding expectations to live up to",
+                          metric=fig(ig, MIXED, fmt="pct", flag="warn")))
+    if trough_pe is not None and trough_pe > 25:
+        T.append(SwotItem(text=f"Expensive on downturn earnings ({trough_pe:.0f}× trough P/E)",
+                          metric=fig(trough_pe, MIXED, fmt="mult", flag="warn")))
+    if lev is not None and lev > 3:
+        T.append(SwotItem(text="Leverage amplifies downside if results weaken",
+                          metric=fig(lev, EDGAR, fmt="mult", flag="warn")))
+    if s.error:
+        T.append(SwotItem(text=f"Incomplete data — interpret with care ({s.error})"))
+
+    # Headline verdict + plain-English paragraph, stitched from the same figures.
+    biz = ("a high-quality business" if roic is not None and roic >= 0.12
+           else "a more average business" if roic is not None else "a business")
+    if mos is None:
+        val = "valuation couldn't be computed (no price/fair-value)"
+        headline = f"{s.name or s.ticker}: {biz}; valuation incomplete."
+    elif mos > 0.15:
+        val = f"it looks cheap, at a {mos*100:.0f}% margin of safety"
+        headline = f"{s.name or s.ticker}: {biz} trading with a margin of safety."
+    elif mos < 0:
+        val = f"it looks expensive — {abs(mos)*100:.0f}% above estimated fair value"
+        headline = f"{s.name or s.ticker}: {biz}, but priced above fair value."
+    else:
+        val = f"it looks roughly fairly valued ({mos*100:.0f}% margin of safety)"
+        headline = f"{s.name or s.ticker}: {biz} around fair value."
+
+    bits = [f"{s.name or s.ticker} is {biz}"]
+    if roic is not None:
+        bits[-1] += f" (returns on capital ~{roic*100:.0f}%{', well-capitalised' if (lev is not None and lev <= 1.5) else ''})"
+    bits.append(f"On valuation, {val}")
+    if ig is not None:
+        bits.append(f"the market is pricing in about {ig*100:.1f}% long-run growth")
+    if T:
+        bits.append(f"key risk: {T[0].text.rstrip('.').lower()}")
+    summary = ". ".join(bits) + "."
+
+    return SwotView(headline=headline, summary=summary,
+                    strengths=S, weaknesses=W, opportunities=O, threats=T)
+
+
 def for_ticker(ticker: str, peers=None, *, wacc=None, terminal_growth=None,
                forecast_years=None, share_basis="wad", fetch_prices=True,
                refresh=False, with_vol=False) -> NameWorkupView:
@@ -148,6 +248,7 @@ def for_ticker(ticker: str, peers=None, *, wacc=None, terminal_growth=None,
         base_margin_of_safety=fig(base_mos, MIXED, fmt="pct",
                                   flag="risk" if (base_mos is not None and base_mos == base_mos and base_mos < 0) else None),
         base_implied_growth=fig(s.base_implied_growth(), MIXED, fmt="pct"),
+        swot=_build_swot(s, base_mos, bands),
         dcf_cases=[_dcf_case_view(c) for c in cases],
         normalized=_normalized_view(s.normalized),
         bands=bands,

@@ -90,6 +90,14 @@ def workup(request: Request, ticker: str, vol: bool = False):
                    ticker=ticker.upper(), vol=vol)
 
 
+@app.get("/workup/{ticker}/news", response_class=HTMLResponse)
+def workup_news(request: Request, ticker: str):
+    """Lazy-loaded NON-PRIMARY headlines panel (HTMX loads it after the page so a
+    slow/offline news feed never blocks the deep-dive)."""
+    return _TEMPLATES.TemplateResponse(
+        request, "_news.html", {"news": service.news.for_ticker(ticker.upper())})
+
+
 @app.get("/pipeline", response_class=HTMLResponse)
 @app.get("/pipeline/{run_token}", response_class=HTMLResponse)
 def pipeline(request: Request, run_token: str | None = None):

@@ -1,0 +1,18 @@
+{# HTMX partial: NON-PRIMARY recent headlines, lazy-loaded into the deep-dive. #}
+{% if news.note and not news.items %}
+  <div class="note">{{ news.note }}</div>
+{% elif news.items %}
+  <table>
+    <tr><th>Date</th><th>Headline</th><th>Source</th></tr>
+    {% for a in news.items %}
+    <tr>
+      <td class="muted" style="white-space:nowrap;">{{ a.published or '—' }}</td>
+      <td>{% if a.link %}<a href="{{ a.link }}" target="_blank" rel="noopener">{{ a.title }}</a>{% else %}{{ a.title }}{% endif %}</td>
+      <td class="muted">{{ a.publisher }}</td>
+    </tr>
+    {% endfor %}
+  </table>
+  <p class="muted" style="font-size:12px;">Headlines from {{ news.source }} — market color only, never part of the valuation. Opens in a new tab.</p>
+{% else %}
+  <div class="note">No recent headlines.</div>
+{% endif %}

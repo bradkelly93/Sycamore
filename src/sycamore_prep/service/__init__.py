@@ -15,6 +15,7 @@ from . import (
     artifacts,
     creds,
     jobs,
+    news,
     overlays,
     pipeline,
     prediction,
@@ -36,6 +37,8 @@ from .viewmodels import (
     MappingRowView,
     MappingView,
     NameWorkupView,
+    NewsItem,
+    NewsView,
     NormalizedView,
     OverlayView,
     PipelineRunRef,
@@ -45,6 +48,8 @@ from .viewmodels import (
     ScreenerRowView,
     ScreenerView,
     SpinoffsView,
+    SwotItem,
+    SwotView,
     SycamoreHoldingRow,
     UniverseView,
     VolPanelView,
@@ -53,12 +58,13 @@ from .viewmodels import (
 
 __all__ = [
     # submodules (facades)
-    "actions", "artifacts", "creds", "jobs", "overlays", "pipeline", "prediction",
-    "screener", "serde", "spinoffs", "universe", "workup",
+    "actions", "artifacts", "creds", "jobs", "news", "overlays", "pipeline",
+    "prediction", "screener", "serde", "spinoffs", "universe", "workup",
     # view-models
     "ActionResult", "ArtifactRef", "BandView", "CredsStatus", "DcfCaseView", "DossierView",
     "Figure", "JobView", "MappingRowView", "MappingView", "NameWorkupView",
-    "NormalizedView", "OverlayView", "PipelineRunRef", "PipelineView", "RankProof",
-    "RankUnchangedClaim", "ScreenerRowView", "ScreenerView", "SpinoffsView",
-    "SycamoreHoldingRow", "UniverseView", "VolPanelView", "fig",
+    "NewsItem", "NewsView", "NormalizedView", "OverlayView", "PipelineRunRef",
+    "PipelineView", "RankProof", "RankUnchangedClaim", "ScreenerRowView", "ScreenerView",
+    "SpinoffsView", "SwotItem", "SwotView", "SycamoreHoldingRow", "UniverseView",
+    "VolPanelView", "fig",
 ]
