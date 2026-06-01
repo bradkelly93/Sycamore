@@ -13,6 +13,7 @@ import numpy as np
 import pandas as pd
 import pytest
 
+from sycamore_prep.service import actions as svc_actions
 from sycamore_prep.service import artifacts as svc_artifacts
 from sycamore_prep.service import pipeline as svc_pipeline
 from sycamore_prep.service import screener as svc_screener
@@ -46,6 +47,8 @@ def wl_root(tmp_path, monkeypatch):
     monkeypatch.setattr(svc_screener, "cache_dir", lambda: cache)
     monkeypatch.setattr(svc_spinoffs, "cache_dir", lambda: cache)
     monkeypatch.setattr(svc_workup, "models_dir", lambda: models)
+    monkeypatch.setattr(svc_actions, "cache_dir", lambda: cache)
+    monkeypatch.setattr(svc_actions, "models_dir", lambda: models)
     return _Roots(cache, models, raw)
 
 

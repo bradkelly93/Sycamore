@@ -1,0 +1,25 @@
+{# HTMX partial: a background-job status card. While running it re-polls itself
+   every 2s; when done/error it stops and shows the result + a link. #}
+{% import "macros.html" as m %}
+{% if not job %}
+  <div class="note">Job not found.</div>
+{% else %}
+<div class="card {{ 'bad' if job.state == 'error' }}"
+     {% if job.state in ('queued', 'running') %}hx-get="/jobs/{{ job.id }}" hx-trigger="every 2s" hx-swap="outerHTML"{% endif %}>
+  <h4>
+    {% if job.state == 'running' %}⏳ Running…
+    {% elif job.state == 'queued' %}⏳ Queued…
+    {% elif job.state == 'done' %}✓ Done
+    {% else %}⚠ Failed{% endif %}
+    <span class="muted" style="font-weight:400;">— {{ job.kind }}{% if job.elapsed_s is not none %} · {{ '%.1f'|format(job.elapsed_s) }}s{% endif %}</span>
+  </h4>
+  {% if job.error %}<p class="fig risk">{{ job.error }}</p>{% endif %}
+  {% if job.state == 'done' %}
+    {% if job.result_summary %}
+    <p>{% for k, v in job.result_summary.items() %}<b>{{ v }}</b> {{ k }}{% if not loop.last %} · {% endif %}{% endfor %}</p>
+    {% endif %}
+    {{ m.download(job.result_ref, job.result_ref.filename if job.result_ref else '') }}
+    {% if job.result_url %}<p><a href="{{ job.result_url }}">See the result →</a></p>{% endif %}
+  {% endif %}
+</div>
+{% endif %}

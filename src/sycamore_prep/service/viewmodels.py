@@ -362,4 +362,17 @@ class JobView(BaseModel):
     finished: str | None = None
     elapsed_s: float | None = None
     result_ref: ArtifactRef | None = None
+    result_summary: dict = Field(default_factory=dict)   # small key->value summary
+    result_url: str | None = None                        # where to send the user on done
     error: str | None = None
+
+
+class ActionResult(BaseModel):
+    """Outcome of a fast, inline single-name action (Phase B)."""
+
+    ok: bool
+    title: str
+    message: str
+    artifacts: list[ArtifactRef] = Field(default_factory=list)
+    detail: dict[str, Figure] = Field(default_factory=dict)
+    link: str | None = None          # e.g. /workup/<ticker> to see the result

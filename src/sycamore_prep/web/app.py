@@ -12,7 +12,7 @@ from __future__ import annotations
 import mimetypes
 from pathlib import Path
 
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, Form, Request
 from fastapi.responses import FileResponse, HTMLResponse
 from fastapi.templating import Jinja2Templates
 
@@ -113,7 +113,7 @@ def spinoffs(request: Request):
 @app.get("/overlays", response_class=HTMLResponse)
 def overlays(request: Request):
     return _render(request, "overlays.html", active="overlays",
-                   mapping=service.prediction.mapping_view())
+                   mapping=service.prediction.mapping_view(editable=True))
 
 
 @app.get("/download/{token}")
@@ -127,3 +127,69 @@ def download(token: str):
         return HTMLResponse("Not found", status_code=404)
     media = mimetypes.guess_type(path.name)[0] or "application/octet-stream"
     return FileResponse(path, filename=path.name, media_type=media)
+
+
+# --------------------------------------------------------------------------- #
+# Phase B — fast, inline single-name actions (HTMX posts; swap a result card)
+# --------------------------------------------------------------------------- #
+def _action_card(request: Request, result):
+    return _TEMPLATES.TemplateResponse(request, "_action_result.html", {"r": result})
+
+
+@app.post("/action/build-model", response_class=HTMLResponse)
+def action_build_model(request: Request, ticker: str = Form(...)):
+    return _action_card(request, service.actions.build_model(ticker))
+
+
+@app.post("/action/vol", response_class=HTMLResponse)
+def action_vol(request: Request, ticker: str = Form(...)):
+    return _action_card(request, service.actions.run_vol(ticker))
+
+
+@app.post("/action/track-spinoff", response_class=HTMLResponse)
+def action_track_spinoff(request: Request, parent: str = Form(...),
+                         spinco: str = Form(None)):
+    return _action_card(request, service.actions.track_spinoff(parent, spinco or None))
+
+
+@app.post("/prediction/confirm", response_class=HTMLResponse)
+def prediction_confirm(request: Request, ticker: str = Form(...), slug: str = Form(...),
+                       confirmed: bool = Form(False), notes: str = Form("")):
+    """Write one human edit back to the mapping CSV (preserves edits by design),
+    then re-render the mapping table partial."""
+    try:
+        mapping = service.prediction.confirm(
+            [{"ticker": ticker, "slug": slug, "confirmed": confirmed, "notes": notes}])
+    except Exception as exc:  # noqa: BLE001
+        mapping = service.prediction.mapping_view(editable=True)
+        mapping.note = f"Save failed: {type(exc).__name__}: {exc}"
+    return _TEMPLATES.TemplateResponse(request, "_mapping_table.html", {"mapping": mapping})
+
+
+# --------------------------------------------------------------------------- #
+# Phase C — heavy background jobs (submit -> poll a status partial)
+# --------------------------------------------------------------------------- #
+@app.post("/jobs/rebuild-universe", response_class=HTMLResponse)
+def job_rebuild_universe(request: Request):
+    job_id = service.jobs.submit("rebuild-universe", service.actions.rebuild_universe_job)
+    return _job_partial(request, job_id)
+
+
+@app.post("/jobs/run-pipeline", response_class=HTMLResponse)
+def job_run_pipeline(request: Request, tickers: str = Form(None), sector: str = Form(None),
+                     sycamore_only: bool = Form(False), top: int = Form(10)):
+    job_id = service.jobs.submit(
+        "run-pipeline", service.actions.run_pipeline_job,
+        tickers=_parse_tickers(tickers), sector=(sector or None),
+        sycamore_only=sycamore_only, top=top)
+    return _job_partial(request, job_id)
+
+
+@app.get("/jobs/{job_id}", response_class=HTMLResponse)
+def job_status(request: Request, job_id: str):
+    return _job_partial(request, job_id)
+
+
+def _job_partial(request: Request, job_id: str):
+    job = service.jobs.get(job_id)
+    return _TEMPLATES.TemplateResponse(request, "_job.html", {"job": job})

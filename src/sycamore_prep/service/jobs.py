@@ -1,10 +1,16 @@
-"""Tiny in-process background-job runner (Phase C). Built + unit-tested now, but
-NOT wired into any UI until Phase C.
+"""Tiny in-process background-job runner (Phase C). Now wired into the web app for
+the two heavy actions: universe rebuild and a full pipeline run.
 
 Design (UI_SPEC §5/§7): a single-worker ``ThreadPoolExecutor`` — work is I/O-bound
 (SEC/yfinance HTTP), so threads keep the UI responsive; ``max_workers=1`` serializes
 runs (respects the SEC ~10 rps limit and avoids cache contention). The registry is a
-module-level singleton so it survives Streamlit reruns (never ``st.session_state``).
+module-level singleton so it survives reruns and is shared across requests.
+
+A job function may return:
+- an :class:`ArtifactRef`            -> surfaced as ``result_ref`` (a download), or
+- a ``dict`` ``{summary, url, artifact}`` -> a small result summary + a link the UI
+  can send the user to (e.g. the freshly-built pipeline run), or
+- anything else                      -> ignored (state still flips to done).
 """
 
 from __future__ import annotations
@@ -64,8 +70,14 @@ def submit(kind: str, fn: Callable, *args, **kwargs) -> str:
     return job.id
 
 
-def _result_ref(result: Any) -> ArtifactRef | None:
-    return result if isinstance(result, ArtifactRef) else None
+def _result_fields(result: Any) -> tuple[ArtifactRef | None, dict, str | None]:
+    if isinstance(result, ArtifactRef):
+        return result, {}, None
+    if isinstance(result, dict):
+        artifact = result.get("artifact")
+        ref = artifact if isinstance(artifact, ArtifactRef) else None
+        return ref, (result.get("summary") or {}), result.get("url")
+    return None, {}, None
 
 
 def get(job_id: str) -> JobView | None:
@@ -77,11 +89,13 @@ def get(job_id: str) -> JobView | None:
         if job.started is not None:
             end = job.finished if job.finished is not None else time.time()
             elapsed = round(end - job.started, 3)
+        ref, summary, url = _result_fields(job.result)
         return JobView(
             id=job.id, kind=job.kind, state=job.state, progress=job.progress, note=job.note,
             started=datetime.fromtimestamp(job.started).isoformat() if job.started else None,
             finished=datetime.fromtimestamp(job.finished).isoformat() if job.finished else None,
-            elapsed_s=elapsed, result_ref=_result_ref(job.result), error=job.error,
+            elapsed_s=elapsed, result_ref=ref, result_summary=summary, result_url=url,
+            error=job.error,
         )
 
 

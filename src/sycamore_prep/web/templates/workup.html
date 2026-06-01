@@ -111,12 +111,27 @@ before what you could make. Use it to decide whether the risk/reward is attracti
   {% endif %}
 
   <h2>Take the work with you</h2>
-  <p class="lead">Every number above traces to a downloadable file.</p>
+  <p class="lead">Every number above traces to a downloadable file. You can also generate the editable Excel
+  model and run the options-market risk cross-check right here.</p>
   <p>
     {{ m.download(view.comps_artifacts.get('xlsx'), 'Comparables + valuation (Excel)') }}
     {{ m.download(view.comps_artifacts.get('md'), 'One-page summary (Markdown)') }}
-    {% if view.model_artifact %}{{ m.download(view.model_artifact, 'Editable Excel model') }}
-    {% else %}<span class="muted">· An editable Excel model can be generated separately — by design the tool never re-creates live spreadsheet formulas in the browser.</span>{% endif %}
+    {% if view.model_artifact %}{{ m.download(view.model_artifact, 'Editable Excel model') }}{% endif %}
   </p>
+
+  <div style="display:flex; gap:8px; flex-wrap:wrap; align-items:center;">
+    <form hx-post="/action/build-model" hx-target="#action-out" hx-swap="innerHTML" hx-indicator="#act-load" style="margin:0;">
+      <input type="hidden" name="ticker" value="{{ ticker }}">
+      <button type="submit" class="dl" style="cursor:pointer;">⚙ {{ 'Rebuild' if view.model_artifact else 'Build' }} the editable Excel model</button>
+    </form>
+    <form hx-post="/action/vol" hx-target="#action-out" hx-swap="innerHTML" hx-indicator="#act-load" style="margin:0;">
+      <input type="hidden" name="ticker" value="{{ ticker }}">
+      <button type="submit" class="dl" style="cursor:pointer;">📈 Run volatility cross-check <span class="muted">(context only)</span></button>
+    </form>
+    <span id="act-load" class="htmx-indicator muted">…working</span>
+  </div>
+  <p class="muted" style="font-size:12px;">The model is a rebuildable Excel scaffold with live formulas — by design the tool
+    generates the file but never re-creates those formulas in the browser. Flex the bear column in Excel.</p>
+  <div id="action-out"></div>
 {% endif %}
 {% endblock %}

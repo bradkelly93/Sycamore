@@ -13,6 +13,15 @@ set everything else works from. Click any ticker to open its deep-dive.</p>
 <b>Market overlays</b> — optional volatility / technical / prediction-market context that is <b>never</b> used to
 score or rank anything. Everything traces back to its source (hover any ● dot).</p></details>
 
+<div class="card" style="margin:10px 0;">
+  <b>Rebuild the investable table.</b> Re-reads the iShares CSVs (if present in <code>data/raw/</code>) and merges
+  Sycamore's holdings. Runs in the background — you can keep using the app.
+  <form hx-post="/jobs/rebuild-universe" hx-target="#job-out" hx-swap="innerHTML" style="display:inline; margin-left:6px;">
+    <button type="submit" class="dl" style="cursor:pointer;">↻ Rebuild now</button>
+  </form>
+  <div id="job-out"></div>
+</div>
+
 {% if view.built %}
   <h2>Built investable table</h2>
   <p class="lead">A de-duplicated master list the screener and pipeline draw from.</p>

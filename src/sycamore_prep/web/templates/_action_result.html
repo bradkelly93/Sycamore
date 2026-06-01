@@ -1,0 +1,13 @@
+{# HTMX partial: the outcome card for a Phase-B single-name action. #}
+{% import "macros.html" as m %}
+<div class="card {{ '' if r.ok else 'bad' }}" style="margin-top:10px;">
+  <h4>{{ '✓' if r.ok else '⚠' }} {{ r.title }}</h4>
+  <p style="margin:4px 0;">{{ r.message }}</p>
+  {% if r.detail %}
+  <table style="max-width:420px;">
+    {% for k, f in r.detail.items() %}<tr><td>{{ k }}</td><td>{{ m.figure(f) }}</td></tr>{% endfor %}
+  </table>
+  {% endif %}
+  {% if r.artifacts %}<p>{% for a in r.artifacts %}{{ m.download(a, a.filename) }}{% endfor %}</p>{% endif %}
+  {% if r.link %}<p><a href="{{ r.link }}">Open the full view →</a></p>{% endif %}
+</div>

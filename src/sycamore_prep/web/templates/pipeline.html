@@ -2,8 +2,20 @@
 {% block content %}
 <h1>Pipeline reports — saved full runs</h1>
 <p class="lead">A pipeline run does the whole job in one shot: screen the universe, shortlist the best names, and build a
-deep-dive for each — saved to a dated folder you can review or share. This page shows runs you've already produced.
-<span class="muted">(Kicking off a new run is a background job that will live on this page later.)</span></p>
+deep-dive for each — saved to a dated folder you can review or share. This page shows runs you've already produced.</p>
+
+<div class="card" style="margin:10px 0;">
+  <b>Run a new pipeline.</b> Leave the tickers blank to run on the top names from your built universe, or list
+  specific tickers. This is heavier (it pulls filings + prices per name), so it runs in the background.
+  <form hx-post="/jobs/run-pipeline" hx-target="#job-out" hx-swap="innerHTML" style="margin-top:8px;">
+    <input type="text" name="tickers" placeholder="tickers (optional), e.g. CW WES UMBF"
+           style="width:320px; padding:5px; border:1px solid var(--line); border-radius:6px;">
+    <label class="muted" style="font-size:12px;">top <input type="number" name="top" value="10" min="1" max="50" style="width:54px;"></label>
+    <label class="muted" style="font-size:12px;"><input type="checkbox" name="sycamore_only" value="true"> Sycamore-owned only</label>
+    <button type="submit" class="dl" style="cursor:pointer;">▶ Run pipeline</button>
+  </form>
+  <div id="job-out"></div>
+</div>
 
 {% if err %}<div class="err">{{ err }}</div>{% endif %}
 {% if not runs %}

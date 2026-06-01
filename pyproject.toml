@@ -32,12 +32,8 @@ dev = [
 vol = [
     "websockets>=12",
 ]
-# Local UI — Phase-A bake-off. Each stack is an independent optional extra; the
-# shared service layer (src/sycamore_prep/service/) needs none of these. Pick one
-# after the bake-off; the loser's extra can be dropped.
-ui-streamlit = [
-    "streamlit>=1.28",
-]
+# Local UI — the FastAPI + Jinja2/HTMX Explorer (chosen after the stack bake-off).
+# The shared service layer (src/sycamore_prep/service/) needs none of these.
 ui-web = [
     "fastapi>=0.110",
     "uvicorn[standard]>=0.27",

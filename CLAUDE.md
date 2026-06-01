@@ -81,19 +81,26 @@ source-tagged columns to the right of the downside flags.
 ## Local UI (thin lens over the engines)
 
 One **local, single-user** UI surfaces the whole toolkit (localhost only; no auth,
-no DB, no hosting). It is built behind a shared, UI-agnostic **service layer** so
-the rendering is the only stack-specific code. Hard rules (mirror the operating
-philosophy — the UI must not become the opaque black box this file forbids):
+no DB, no hosting): a **FastAPI + Jinja2/HTMX** Explorer (`src/sycamore_prep/web/`,
+chosen after a Streamlit-vs-FastAPI bake-off). It is built behind a shared,
+UI-agnostic **service layer** so the rendering is the only stack-specific code.
+Hard rules (mirror the operating philosophy — the UI must not become the opaque
+black box this file forbids):
 
 - **No analytics in the UI.** All non-rendering logic lives in
   `src/sycamore_prep/service/` — it calls the engine entry points and normalizes
   their returns into plain, JSON-safe view-models that already carry source tags,
   the three sub-scores kept separate, downside flags, and overlay
-  non-primary/walled-off provenance. Front-ends render purely from these.
+  non-primary/walled-off provenance. The web layer renders purely from these and
+  posts back through the service (`service/actions.py`, `service/jobs.py`).
 - **Source tag on every number; downside-first; three attributes never collapsed;
   overlays segregated + NON-PRIMARY** (with a visible proof that toggling them
   never changes `composite_rank`); **Excel = link/download only; everything
   auditable** (download the underlying xlsx/csv from every view).
+- **Reads are inline; writes/long runs are explicit.** Fast single-name actions
+  (build the Excel scaffold, run the vol cross-check, confirm a prediction mapping)
+  run inline; heavy runs (universe rebuild, full pipeline) run as background jobs
+  with a live status panel — never blocking, never a second analytics path.
 - Credentials are read from env (same as the CLI); never stored, never written to
   disk, never surfaced as values — only ✓/✗ presence.
 
@@ -132,12 +139,14 @@ src/sycamore_prep/
                  #   pandas/Path at the JSON boundary): wraps the engine entry
                  #   points into JSON-safe pydantic view-models carrying source
                  #   tags, separate Q1/Q2/Q3, downside flags, overlay provenance.
-                 #   No UI imports. + a tiny background-job runner (jobs.py).
-  web/           # FastAPI + Jinja2/HTMX read-only Explorer (renders service/)
+                 #   No UI imports. + actions.py (write/long paths) + jobs.py
+                 #   (background-job runner).
+  web/           # FastAPI + Jinja2/HTMX Explorer (renders service/): read views,
+                 #   inline single-name actions, + background universe/pipeline jobs
+data/sycamore_holdings.csv  # committed Victory Sycamore fund holdings (overlay)
 models/          # Excel scaffolds + MODEL_NOTES.md (committed: notes + templates)
 data/raw/        # manually-dropped CSVs (ETF / fund holdings)
 data/cache/      # parquet cache of pulled fundamentals + prices + overlays
-app_streamlit.py # Streamlit read-only Explorer (renders service/) — repo root
 ```
 
 ## Build phases
