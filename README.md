@@ -491,7 +491,24 @@ fully wired and offline-tested against fixtures, but `prediction-discover` and
 `prediction-overlay` must run where Polymarket is reachable. The mapping CSV,
 the relevance scorer, and the overlay assembly all work offline.
 
+## Web UI (local Explorer)
+
+A thin, **local, single-user** UI over the same engines — localhost only, no auth,
+no database, no hosting (credentials come from env, exactly like the CLI). It
+renders the engines' already-computed outputs; it runs no analytics of its own.
+
+```bash
+sycamore-prep web                 # serve at http://127.0.0.1:8010
+sycamore-prep web --port 8011     # pick another port if 8010 is busy
+```
+
+Open the printed URL in your browser; press `Ctrl+C` in the terminal to stop.
+Reads (universe, screen, single-name deep-dives) render inline; heavy runs
+(universe rebuild, full pipeline) run as background jobs with a live status panel.
+
 ## Non-goals
 
-No web UI, no paid data services, no backtester, no macro overlay. This is
+No paid data services, no backtester, no portfolio optimizer, no order placement,
+no macro overlay driving the score. The one UI above is a deliberately thin,
+local, read-mostly lens — no auth, no DB, no hosting, no multi-user. This is
 bottom-up decision support — see `CLAUDE.md` for the full list.

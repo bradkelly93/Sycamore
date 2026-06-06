@@ -687,5 +687,25 @@ def config_check() -> None:
                f"{sorted(cfg.prediction.sector_keywords.keys())})")
 
 
+@app.command("web")
+def web(
+    port: int = typer.Option(8010, "--port", "-p", help="Port to serve on."),
+    host: str = typer.Option("127.0.0.1", "--host", help="Bind address — localhost only by default."),
+    reload: bool = typer.Option(False, "--reload", help="Auto-reload on code changes (development)."),
+) -> None:
+    """Launch the local Explorer UI (FastAPI + HTMX) and serve it in your browser.
+
+    Localhost-only, single-user, no auth — reads the same env-based credentials as
+    the CLI. Open the printed URL in your browser; press Ctrl+C to stop.
+    """
+    import uvicorn  # lazy: keeps offline CLI/tests free of the web stack
+
+    typer.secho(
+        f"Sycamore Explorer → http://{host}:{port}  (open in your browser; Ctrl+C to stop)",
+        fg=typer.colors.GREEN,
+    )
+    uvicorn.run("sycamore_prep.web:app", host=host, port=port, reload=reload)
+
+
 if __name__ == "__main__":
     app()
