@@ -60,7 +60,18 @@ CANONICAL_CONCEPTS: dict[str, list[str]] = {
 
     # Cash flow
     "OperatingCashFlow":       ["NetCashProvidedByUsedInOperatingActivities"],
-    "CapEx":                   ["PaymentsToAcquirePropertyPlantAndEquipment"],
+    # E&P / midstream filers book capex under oil-and-gas-property tags, not
+    # generic PP&E — without these synonyms FCF silently equals CFO for the
+    # whole energy sector (caught via MGY: 67% "FCF margin" was impossible).
+    # Limitation: the richest-synonym picker selects ONE tag, so filers that
+    # split capex across development + acquisition tags may still understate
+    # capex. Hand-verify against the filing for any name used in a pitch.
+    "CapEx":                   ["PaymentsToAcquirePropertyPlantAndEquipment",
+                                "PaymentsToExploreAndDevelopOilAndGasProperties",
+                                "PaymentsToAcquireOilAndGasProperty",
+                                "PaymentsToAcquireOilAndGasPropertyAndEquipment",
+                                "PaymentsForCapitalImprovements",
+                                "PaymentsToAcquireProductiveAssets"],
     "DepreciationAndAmortization": ["DepreciationDepletionAndAmortization",
                                     "DepreciationAmortizationAndAccretionNet",
                                     "DepreciationAndAmortization",

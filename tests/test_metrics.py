@@ -136,6 +136,16 @@ def test_revenue_and_margins():
     assert gross_margin_fy(ff).iloc[-1] == pytest.approx(500 / 1200)
 
 
+def test_fcf_returns_empty_when_capex_missing():
+    """Missing capex must NOT silently become zero — that makes FCF = CFO,
+    which produced impossible 60%+ 'FCF margins' for E&P names whose capex
+    lives under oil-and-gas tags the old synonym list didn't cover."""
+    rows = [r for r in INDUSTRIAL_ROWS if r["concept"] != "CapEx"]
+    ff = _ff(rows)
+    assert free_cash_flow_fy(ff).empty
+    assert fcf_margin_fy(ff).empty
+
+
 def test_free_cash_flow_and_margin_and_yield():
     ff = _ff(INDUSTRIAL_ROWS)
     assert free_cash_flow_fy(ff).iloc[-1] == pytest.approx(170.0)        # 220-50

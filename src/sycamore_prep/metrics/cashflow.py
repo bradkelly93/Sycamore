@@ -12,11 +12,15 @@ def free_cash_flow_fy(ff: FinancialsFrame) -> pd.Series:
     """FCF = Operating Cash Flow - CapEx.
 
     Both inputs are reported as positive numbers in our tagging, so we
-    subtract directly. Returns NaN if either is missing.
+    subtract directly. If NO capex was found for the ticker, return empty
+    rather than treating capex as zero — a silent zero makes FCF equal CFO,
+    which materially overstates FCF (the wrong direction for a downside-first
+    screen; this produced impossible 60%+ "FCF margins" for E&Ps before the
+    oil-and-gas capex tag synonyms were added).
     """
     cfo = _series(ff, "OperatingCashFlow")
     capex = _series(ff, "CapEx")
-    if cfo.empty:
+    if cfo.empty or capex.empty:
         return pd.Series(dtype=float, name="FreeCashFlow")
     common = cfo.index
     capex_aligned = capex.reindex(common).fillna(0)
