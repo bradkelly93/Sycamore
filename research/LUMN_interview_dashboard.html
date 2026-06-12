@@ -1,0 +1,513 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>LUMN Case Study Dashboard — Sycamore Interview Prep</title>
+<style>
+  :root{
+    --ink:#1a2332; --muted:#5b6776; --paper:#f7f8fa; --card:#ffffff;
+    --line:#dde3ea; --accent:#0e5fa8; --accent2:#0b7a5c; --red:#b3392e;
+    --amber:#9a6b00; --tldr:#eef4fb; --tldrline:#bcd4ec; --warn:#fdf3e7;
+    --warnline:#ecd3a8; --good:#ecf7f1; --goodline:#bfe0cf;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;font-family:Georgia,'Times New Roman',serif;background:var(--paper);color:var(--ink);line-height:1.55}
+  header.masthead{background:var(--ink);color:#fff;padding:28px 36px}
+  header.masthead h1{margin:0;font-size:26px;letter-spacing:.3px}
+  header.masthead .sub{color:#b8c4d4;font-size:14px;margin-top:6px;font-family:Helvetica,Arial,sans-serif}
+  nav{position:sticky;top:0;background:#fff;border-bottom:2px solid var(--line);z-index:10;padding:8px 36px;font-family:Helvetica,Arial,sans-serif;font-size:12.5px}
+  nav a{color:var(--accent);text-decoration:none;margin-right:14px;white-space:nowrap}
+  nav a:hover{text-decoration:underline}
+  main{max-width:1180px;margin:0 auto;padding:24px 36px 80px}
+  section{margin-top:42px}
+  h2{font-size:21px;border-bottom:3px solid var(--ink);padding-bottom:6px;margin-bottom:4px}
+  h2 .secno{color:var(--accent);margin-right:8px}
+  h3{font-size:16px;margin:22px 0 8px}
+  p{margin:8px 0}
+  .tldr{background:var(--tldr);border:1px solid var(--tldrline);border-left:6px solid var(--accent);
+        padding:10px 16px;margin:14px 0;font-family:Helvetica,Arial,sans-serif;font-size:13.5px}
+  .tldr b.tag{color:var(--accent);letter-spacing:1px;font-size:11px}
+  .warnbox{background:var(--warn);border:1px solid var(--warnline);border-left:6px solid var(--amber);padding:10px 16px;margin:14px 0;font-family:Helvetica,Arial,sans-serif;font-size:13.5px}
+  .goodbox{background:var(--good);border:1px solid var(--goodline);border-left:6px solid var(--accent2);padding:10px 16px;margin:14px 0;font-family:Helvetica,Arial,sans-serif;font-size:13.5px}
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:18px}
+  .grid3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px}
+  @media(max-width:900px){.grid2,.grid3{grid-template-columns:1fr}}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:6px;padding:16px 18px}
+  .card h4{margin:0 0 8px;font-size:14px;font-family:Helvetica,Arial,sans-serif;color:var(--accent)}
+  .kpi{font-size:24px;font-weight:bold}
+  .kpi small{font-size:12px;color:var(--muted);font-weight:normal}
+  table{border-collapse:collapse;width:100%;font-size:13px;font-family:Helvetica,Arial,sans-serif;margin:10px 0}
+  th{background:var(--ink);color:#fff;text-align:left;padding:7px 9px;font-weight:600}
+  td{border-bottom:1px solid var(--line);padding:7px 9px;vertical-align:top}
+  tr:nth-child(even) td{background:#fafbfc}
+  .up{color:var(--accent2);font-weight:bold}.dn{color:var(--red);font-weight:bold}.fl{color:var(--amber);font-weight:bold}
+  .src{color:var(--muted);font-size:11px;font-family:Helvetica,Arial,sans-serif}
+  .chartwrap{background:var(--card);border:1px solid var(--line);border-radius:6px;padding:14px;margin:14px 0}
+  .chartwrap .ctitle{font-family:Helvetica,Arial,sans-serif;font-size:13px;font-weight:bold;margin-bottom:4px}
+  .chartwrap .cnote{font-family:Helvetica,Arial,sans-serif;font-size:11px;color:var(--muted);margin-top:4px}
+  svg text{font-family:Helvetica,Arial,sans-serif}
+  .timeline{border-left:3px solid var(--accent);margin:18px 0 0 8px;padding-left:0;list-style:none}
+  .timeline li{position:relative;padding:0 0 18px 26px}
+  .timeline li::before{content:'';position:absolute;left:-9px;top:5px;width:14px;height:14px;border-radius:50%;background:#fff;border:3px solid var(--accent)}
+  .timeline li.bad::before{border-color:var(--red)}
+  .timeline li.good::before{border-color:var(--accent2)}
+  .timeline .when{font-family:Helvetica,Arial,sans-serif;font-weight:bold;font-size:13px;color:var(--accent)}
+  .timeline li.bad .when{color:var(--red)} .timeline li.good .when{color:var(--accent2)}
+  .timeline .px{font-family:Helvetica,Arial,sans-serif;font-size:11.5px;color:var(--muted)}
+  .qa{background:var(--card);border:1px solid var(--line);border-radius:6px;margin:12px 0;padding:14px 18px}
+  .qa .q{font-weight:bold;font-size:14.5px}
+  .qa .why{font-family:Helvetica,Arial,sans-serif;font-size:11.5px;color:var(--muted);margin:3px 0 8px}
+  .qa .a{font-size:13.5px}
+  .qa .trap{font-family:Helvetica,Arial,sans-serif;font-size:12px;color:var(--red);margin-top:8px}
+  .pill{display:inline-block;font-family:Helvetica,Arial,sans-serif;font-size:10.5px;font-weight:bold;border-radius:10px;padding:1px 9px;margin-left:6px;vertical-align:middle}
+  .pill.p{background:#e2efe8;color:var(--accent2)} .pill.s{background:#fdeeee;color:var(--red)} .pill.c{background:#fff3d6;color:var(--amber)}
+  .legendline{font-family:Helvetica,Arial,sans-serif;font-size:11px;color:var(--muted)}
+  footer{margin-top:60px;border-top:2px solid var(--line);padding-top:14px;font-size:11.5px;color:var(--muted);font-family:Helvetica,Arial,sans-serif}
+  .num{font-variant-numeric:tabular-nums}
+</style>
+</head>
+<body>
+
+<header class="masthead">
+  <h1>LUMEN TECHNOLOGIES (NYSE: LUMN) — Position Case Study</h1>
+  <div class="sub">Interview dashboard &middot; Sycamore Capital / James Albers &middot; Data as of June 11, 2026 (close $8.49) &middot;
+  Source labels: <b>[P]</b> SEC filing / company &middot; <b>[S]</b> secondary &middot; <b>[C]</b> own computation &middot; Position: entered ~$6.00 (2H 2025), +~42%</div>
+</header>
+
+<nav>
+  <a href="#s1">1 TLDR</a><a href="#s2">2 History</a><a href="#s3">3 Financial Arc</a><a href="#s4">4 Services</a>
+  <a href="#s5">5 Why Customers Buy / Moat</a><a href="#s6">6 PCF &amp; the AI Story</a><a href="#s7">7 Three-Attribute Scorecard</a>
+  <a href="#s8">8 Opportunities</a><a href="#s9">9 Risks</a><a href="#s10">10 Kill-Switches</a><a href="#s11">11 My Position Story</a>
+  <a href="#s12">12 Albers Q&amp;A Prep</a><a href="#s13">13 Cheat Card</a>
+</nav>
+
+<main>
+
+<!-- ================= 1 TLDR ================= -->
+<section id="s1">
+  <h2><span class="secno">1</span>The whole story in 60 seconds</h2>
+  <div class="tldr"><b class="tag">TLDR</b> &mdash; Lumen is three old telecoms glued together (CenturyLink local phone + Qwest Baby Bell + Level&nbsp;3 internet backbone) whose legacy products have been melting ~5&ndash;10%/yr for a decade. It nearly went bankrupt in 2023 (stock ~$1). Since then: a creditor amend-and-extend (Mar 2024), ~$13B of <i>prepaid</i> AI-fiber contracts from Microsoft/Meta/AWS/Google/Anthropic (2024&ndash;26), the sale of its consumer fiber unit to AT&amp;T for $5.75B (closed Feb 2026), debt down from $17.8B to $13.1B, and upgrades from all three rating agencies. The bet: hyperscaler cash funds a rebuilt national fiber network while a $1B cost program and enterprise mix-shift produce an EBITDA inflection (2026&ndash;27 pro forma) and revenue growth (business 2028, total 2029). The trap: headline FCF is propped by prepayments &mdash; underlying FCF is still negative &mdash; and management has promised this inflection before and missed.</div>
+  <div class="grid3">
+    <div class="card"><h4>PRICE / VALUE</h4><div class="kpi num">$8.49 <small>6/11/26</small></div>
+      Mkt cap ~$8.7B &middot; EV ~$20.1B [C]<br>EV/2026E EBITDA ~6.3x [C]<br>52-wk $3.37&ndash;$11.95 &middot; +96% TTM<br>
+      Consensus PT ~$7.9&ndash;8.3 [S] &middot; Morningstar FVE ~$7.50 [S]</div>
+    <div class="card"><h4>P&amp;L (FY2025 [P])</h4><div class="kpi num">$12.4B <small>rev, &minus;5%</small></div>
+      Adj. EBITDA $3.36B (&minus;14.7%), margin 27.1%<br>2026 guide $3.1&ndash;3.3B<br>Net loss $(1.74)B (impairment + debt-retirement)<br>FCF ex-SI $1.04B&hellip; but see &sect;3.4</div>
+    <div class="card"><h4>BALANCE SHEET (3/31/26 [P])</h4><div class="kpi num">$13.1B <small>debt principal</small></div>
+      Cash $1.6B &rarr; net debt ~$11.3B [C]<br>Leverage ~3.5x [C] / 3.8x per CFO / "&lt;4x" PR<br>Maturities: $31M '26 / $20M '27 / $380M '28<br>Pension+OPEB unfunded ~$2.3B (off-ratio)</div>
+  </div>
+</section>
+
+<!-- ================= 2 HISTORY ================= -->
+<section id="s2">
+  <h2><span class="secno">2</span>History — how it got here</h2>
+  <div class="tldr"><b class="tag">TLDR</b> &mdash; A rural phone company levered up to buy two bigger businesses (Qwest 2011, Level&nbsp;3 2017, ~$34B with debt), wrote off ~$26.5B of goodwill over the next eight years, cut the dividend three times (gone entirely Nov 2022), and hit ~$1.00 in 2023&ndash;24. Everything since Kate Johnson arrived (Nov 2022) is triage-then-pivot: sell what others value more, fix the debt, point the fiber at AI.</div>
+
+  <div class="chartwrap">
+    <div class="ctitle">Share price journey, 2022 &rarr; June 2026 (approximate monthly closes, log-style emphasis on key events)</div>
+    <svg viewBox="0 0 1060 320" width="100%">
+      <!-- axes -->
+      <line x1="50" y1="20" x2="50" y2="270" stroke="#999"/><line x1="50" y1="270" x2="1030" y2="270" stroke="#999"/>
+      <text x="14" y="30" font-size="11" fill="#666">$13</text><text x="14" y="105" font-size="11" fill="#666">$9</text>
+      <text x="14" y="180" font-size="11" fill="#666">$5</text><text x="14" y="262" font-size="11" fill="#666">$1</text>
+      <!-- gridlines -->
+      <line x1="50" y1="25" x2="1030" y2="25" stroke="#eee"/><line x1="50" y1="100" x2="1030" y2="100" stroke="#eee"/>
+      <line x1="50" y1="175" x2="1030" y2="175" stroke="#eee"/><line x1="50" y1="255" x2="1030" y2="255" stroke="#eee"/>
+      <!-- price path: x Jan22=60 .. Jun26=1020 (~18px/mo); y = 270 - (price-1)*18.75 ; $1=270,$5=195?? use y=270-(p-1)*20 -->
+      <polyline fill="none" stroke="#0e5fa8" stroke-width="2.5" points="
+        60,40 78,55 96,75 114,90 132,105 150,110 168,120 186,135 204,140 222,150 240,165
+        258,185 276,200 294,210 312,215 330,220 348,228 366,235 384,245 402,250 420,258
+        438,255 456,252 474,250 492,253 510,256 528,258 546,260 564,262 582,248 600,180
+        618,170 636,162 654,158 672,168 690,175 708,180 726,178 744,182 762,170 780,160
+        798,150 816,140 834,120 852,95 870,52 888,90 906,115 924,105 942,108 960,100
+        978,115 996,122 1014,120"/>
+      <!-- entry marker ~$6 around Sep-Oct 2025 (x~816-834, y~150) -->
+      <circle cx="822" cy="146" r="7" fill="#0b7a5c"/>
+      <text x="760" y="132" font-size="11.5" font-weight="bold" fill="#0b7a5c">MY ENTRY ~$6</text>
+      <!-- event flags -->
+      <line x1="240" y1="165" x2="240" y2="60" stroke="#b3392e" stroke-dasharray="3,3"/>
+      <text x="160" y="50" font-size="11" fill="#b3392e">Nov '22: dividend killed (&minus;18%)</text>
+      <line x1="294" y1="210" x2="294" y2="95" stroke="#b3392e" stroke-dasharray="3,3"/>
+      <text x="250" y="88" font-size="11" fill="#b3392e">Feb '23: guidance crash (&minus;21%)</text>
+      <line x1="420" y1="258" x2="420" y2="150" stroke="#b3392e" stroke-dasharray="3,3"/>
+      <text x="350" y="143" font-size="11" fill="#b3392e">Nov '23: &minus;27% / ~$1 lows</text>
+      <line x1="564" y1="262" x2="564" y2="200" stroke="#9a6b00" stroke-dasharray="3,3"/>
+      <text x="475" y="193" font-size="11" fill="#9a6b00">Mar '24: TSA closes (S&amp;P "SD")</text>
+      <line x1="600" y1="180" x2="600" y2="100" stroke="#0b7a5c" stroke-dasharray="3,3"/>
+      <text x="555" y="93" font-size="11" fill="#0b7a5c">Aug '24: $5B PCF &mdash; stock ~4x off low</text>
+      <line x1="870" y1="52" x2="870" y2="30" stroke="#0b7a5c" stroke-dasharray="3,3"/>
+      <text x="840" y="24" font-size="11" fill="#0b7a5c">Nov 3 '25: $11.95 high</text>
+      <line x1="942" y1="108" x2="942" y2="190" stroke="#0e5fa8" stroke-dasharray="3,3"/>
+      <text x="880" y="205" font-size="11" fill="#0e5fa8">Feb 2 '26: AT&amp;T close; ratings upgrades</text>
+      <line x1="996" y1="122" x2="996" y2="220" stroke="#b3392e" stroke-dasharray="3,3"/>
+      <text x="930" y="236" font-size="11" fill="#b3392e">May 5&ndash;7 '26: Q1 miss &minus;8%</text>
+      <text x="60" y="290" font-size="11" fill="#666">2022</text><text x="276" y="290" font-size="11" fill="#666">2023</text>
+      <text x="492" y="290" font-size="11" fill="#666">2024</text><text x="708" y="290" font-size="11" fill="#666">2025</text>
+      <text x="924" y="290" font-size="11" fill="#666">2026</text>
+      <text x="1000" y="290" font-size="11" font-weight="bold" fill="#0e5fa8">$8.49</text>
+    </svg>
+    <div class="cnote">Path is approximate (monthly, from public charts [S]); event dates and magnitudes are verified ([P]/[S] per deep-dive ledger). Not for precise P&amp;L math.</div>
+  </div>
+
+  <ul class="timeline">
+    <li><span class="when">1930&ndash;2009</span> &mdash; CenturyTel/CenturyLink: rural local phone roll-up. Cash-cow copper voice + DSL; the dividend was the story. <span class="px">Revenue/profit source: regulated-ish consumer/SMB phone &amp; broadband.</span></li>
+    <li><span class="when">Apr 2011</span> &mdash; Buys <b>Qwest</b> ($22.4B EV incl. $11.8B debt [P]) &mdash; becomes a Baby Bell across 14 western/midwestern states. More copper, more voice, bigger dividend, bigger debt.</li>
+    <li><span class="when">Nov 2017</span> &mdash; Buys <b>Level 3</b> (~$34B with debt [P]) &mdash; the strategic turn: intercity fiber backbone, enterprise/wholesale networking, CDN-era assets. Revenue mix flips toward <b>business services (~70&ndash;75%)</b>. Jeff Storey (L3 CEO) takes over.</li>
+    <li class="bad"><span class="when">2013 / 2019 / Nov 2022</span> &mdash; Dividend cut 26%, then 54%, then <b>eliminated</b> (~$1B/yr saved; stock &minus;17.7% next day [P]/[S]). The income-investor shareholder base is destroyed in stages.</li>
+    <li class="bad"><span class="when">2018&ndash;2025</span> &mdash; <b>~$26.5B cumulative goodwill write-offs</b> [P, 10-Ks; C sum] &mdash; the accounting confession that Qwest+Level 3 never earned their price tags. ~3x today&rsquo;s market cap.</li>
+    <li><span class="when">2022</span> &mdash; Shrink-to-survive asset sales: Latin America ($2.7B), 20-state ILEC to Brightspeed (~$5.6B net), later EMEA to Colt (2023). Revenue $19.7B (&rsquo;21) &rarr; $14.6B (&rsquo;23).</li>
+    <li><span class="when">Nov 2022</span> &mdash; <b>Kate Johnson</b> (ex-Microsoft US president) becomes CEO; CFO Chris Stansbury (Apr 2022, ex-Arrow). Feb 2023: her reset guide (EBITDA $4.6&ndash;4.8B vs $4.95B consensus; FCF ~breakeven) crashes the stock 21%.</li>
+    <li class="bad"><span class="when">2023</span> &mdash; Near-distress: bonds at ~57&cent; [S], whole debt complex marked ~67.5&cent; average at YE23 in Lumen&rsquo;s own fair-value footnote [P]; stock bottoms ~$1.0x; below-par debt exchanges book gains.</li>
+    <li><span class="when">Mar 22, 2024</span> &mdash; <b>TSA restructuring</b> closes: &gt;$15B participates; maturities pushed from a $9.4B 2027 wall to 2029&ndash;30; $1.325B new money at 10.5&ndash;11%; ~$260M of premiums to the ad-hoc group; holdout stubs stripped of collateral. S&amp;P calls it <b>Selective Default</b>; Fitch <b>RD</b> [P/S]. Time bought, problem (EBITDA decline) not fixed.</li>
+    <li class="good"><span class="when">Jul&ndash;Aug 2024</span> &mdash; The pivot lands: Microsoft PCF deal (Jul 24), <b>"$5B of new AI business"</b> + Custom Networks division (Aug 5), Corning deal reserving 10% of global fiber supply. Stock roughly quadruples off the ~$1 July low. Kerrisdale shorts it at ~7x EV/EBITDA (Aug 27) [S].</li>
+    <li class="good"><span class="when">2024&ndash;Feb 2026</span> &mdash; PCF total compounds: $5B &rarr; $8.5B (Feb &rsquo;25) &rarr; $10B+ (Oct &rsquo;25) &rarr; <b>~$13B</b> (Feb &rsquo;26), customers incl. Microsoft, Meta, AWS, Google, <b>Anthropic</b> [P]. ~$4.5B signed in the last twelve months alone.</li>
+    <li class="good"><span class="when">May 21, 2025 &rarr; Feb 2, 2026</span> &mdash; <b>Sells consumer fiber (Quantum Fiber, 11 states) to AT&amp;T for $5.75B</b>; closes early; ~$4.8B + cash retires the <i>entire</i> superpriority stack. Debt $17.8B &rarr; $13.1B; interest &minus;~45%; Moody&rsquo;s/S&amp;P/Fitch all upgrade (B2/B&minus;/B) [P].</li>
+    <li><span class="when">Feb 25, 2026</span> &mdash; Investor Day: business revenue growth 2028, total revenue growth 2029, EBITDA margin to mid-30%s by 2030, leverage target 3.0&ndash;3.5x, 47M intercity fiber miles by 2028 [P, deck]. May 2026: $475M Alkira (NaaS) acquisition; Q1 print misses on adjusted EPS, stock &minus;8% in two sessions.</li>
+  </ul>
+
+  <div class="warnbox"><b>Pattern to acknowledge before James does:</b> this management team and its predecessors have a long record of value destruction (M&amp;A, impairments, dividend), and the current team has <i>twice</i> over-promised the inflection (2023 Investor Day promised 2024 stability &mdash; got &minus;10% revenue / &minus;15% EBITDA; Feb 2025 promised "2026 EBITDA &gt; $3.5B" &mdash; actual guide $3.1&ndash;3.3B). Owning this openly is the credibility move; the rebuttal is that the <i>2025&ndash;26 deliverables</i> (debt paydown, cost-out beats, AT&amp;T close, PCF signings) were executed, not promised.</div>
+</section>
+
+<!-- ================= 3 FINANCIAL ARC ================= -->
+<section id="s3">
+  <h2><span class="secno">3</span>The financial arc in five charts</h2>
+  <div class="tldr"><b class="tag">TLDR</b> &mdash; Revenue and EBITDA fall every year; debt was the existential issue and is now fixed-ish; the deferred-revenue chart is the single most important exhibit in this deck &mdash; it shows the AI cash is real but is prepayment, not profit.</div>
+
+  <div class="grid2">
+    <div class="chartwrap">
+      <div class="ctitle">3.1 Revenue ($B) &mdash; melting, partly by design (divestitures)</div>
+      <svg viewBox="0 0 480 230" width="100%">
+        <line x1="40" y1="190" x2="460" y2="190" stroke="#999"/>
+        <!-- bars: 2021 19.7, 22 17.5, 23 14.6, 24 13.1, 25 12.4, 25PF 11.7 ; scale 8px/$B -->
+        <rect x="55"  y="32.4" width="48" height="157.6" fill="#0e5fa8"/><text x="60" y="26" font-size="11">19.7</text><text x="62" y="206" font-size="11">2021</text>
+        <rect x="120" y="50"   width="48" height="140"   fill="#0e5fa8"/><text x="126" y="44" font-size="11">17.5</text><text x="127" y="206" font-size="11">2022</text>
+        <rect x="185" y="73.2" width="48" height="116.8" fill="#0e5fa8"/><text x="191" y="67" font-size="11">14.6</text><text x="192" y="206" font-size="11">2023</text>
+        <rect x="250" y="85.1" width="48" height="104.9" fill="#0e5fa8"/><text x="256" y="79" font-size="11">13.1</text><text x="257" y="206" font-size="11">2024</text>
+        <rect x="315" y="90.8" width="48" height="99.2"  fill="#0e5fa8"/><text x="321" y="84" font-size="11">12.4</text><text x="322" y="206" font-size="11">2025</text>
+        <rect x="380" y="96.5" width="48" height="93.5"  fill="#7fa8cc"/><text x="386" y="90" font-size="11">11.7</text><text x="378" y="206" font-size="11">'25 PF*</text>
+      </svg>
+      <div class="cnote">[P] 10-Ks / XBRL. *Pro forma ex the divested consumer-fiber unit (the 2026 starting base). 2022&ndash;24 declines include LatAm/ILEC/EMEA sales &mdash; organic decline is gentler but real (Business segment &minus;3% YoY for 5 straight quarters [P]).</div>
+    </div>
+    <div class="chartwrap">
+      <div class="ctitle">3.2 Adjusted EBITDA ex-SI ($B) &mdash; four straight down years</div>
+      <svg viewBox="0 0 480 230" width="100%">
+        <line x1="40" y1="190" x2="460" y2="190" stroke="#999"/>
+        <!-- scale 22px/$B: 6.86->150.9h, 4.63->101.9, 3.94->86.7, 3.36->73.9, 3.2->70.4, PF2.9->63.8 -->
+        <rect x="55"  y="39.1"  width="48" height="150.9" fill="#0b7a5c"/><text x="61" y="33" font-size="11">6.86</text><text x="62" y="206" font-size="11">2022</text>
+        <rect x="120" y="88.1"  width="48" height="101.9" fill="#0b7a5c"/><text x="126" y="82" font-size="11">4.63</text><text x="127" y="206" font-size="11">2023</text>
+        <rect x="185" y="103.3" width="48" height="86.7"  fill="#0b7a5c"/><text x="191" y="97" font-size="11">3.94</text><text x="192" y="206" font-size="11">2024</text>
+        <rect x="250" y="116.1" width="48" height="73.9"  fill="#0b7a5c"/><text x="256" y="110" font-size="11">3.36</text><text x="257" y="206" font-size="11">2025</text>
+        <rect x="315" y="126.2" width="48" height="63.8"  fill="#9bc4b2"/><text x="318" y="120" font-size="11">~2.9</text><text x="310" y="206" font-size="11">'25 PF [C]</text>
+        <rect x="380" y="119.6" width="48" height="70.4"  fill="#0e5fa8"/><text x="380" y="113" font-size="11">3.1&ndash;3.3</text><text x="380" y="206" font-size="11">2026E</text>
+      </svg>
+      <div class="cnote">[P] releases; PF base ~$2.9B = 2025 minus ~$460M divested-unit direct EBITDA [C from pro-forma 8-K]. The "2026 growth" claim only works vs the PF bar &mdash; know this cold.</div>
+    </div>
+    <div class="chartwrap">
+      <div class="ctitle">3.3 Total debt principal ($B) &mdash; the existential fix</div>
+      <svg viewBox="0 0 480 230" width="100%">
+        <line x1="40" y1="190" x2="460" y2="190" stroke="#999"/>
+        <!-- scale 7.5px/$B: 20.1->150.8,18.5->138.8,17.8->133.5,13.1->98.3 -->
+        <rect x="70"  y="39.2" width="60" height="150.8" fill="#b3392e"/><text x="80" y="33" font-size="11">20.1</text><text x="78" y="206" font-size="11">YE23</text>
+        <rect x="165" y="51.2" width="60" height="138.8" fill="#b3392e"/><text x="175" y="45" font-size="11">18.5</text><text x="173" y="206" font-size="11">YE24</text>
+        <rect x="260" y="56.5" width="60" height="133.5" fill="#b3392e"/><text x="270" y="50" font-size="11">17.8</text><text x="268" y="206" font-size="11">YE25</text>
+        <rect x="355" y="91.7" width="60" height="98.3"  fill="#0b7a5c"/><text x="365" y="85" font-size="11">13.1</text><text x="355" y="206" font-size="11">3/31/26</text>
+        <text x="300" y="120" font-size="11" fill="#0b7a5c" font-weight="bold">&minus;$4.7B: AT&amp;T</text>
+        <text x="300" y="134" font-size="11" fill="#0b7a5c" font-weight="bold">proceeds, Feb '26</text>
+      </svg>
+      <div class="cnote">[P] 10-K/10-Q. Maturity runway now: $31M '26, $20M '27, $380M '28, $1.28B '29, $141M '30, $11.2B 2031+ (at 6.875&ndash;8.5% money). Covenant: 5.25x max net leverage vs ~3.5x actual.</div>
+    </div>
+    <div class="chartwrap">
+      <div class="ctitle">3.4 THE chart: PCF prepayments vs PCF revenue recognized</div>
+      <svg viewBox="0 0 480 230" width="100%">
+        <line x1="40" y1="190" x2="460" y2="190" stroke="#999"/>
+        <!-- deferred revenue balance: 2.6,4.6,7.4,9.1 scale 16px/B -->
+        <rect x="60"  y="148.4" width="52" height="41.6"  fill="#0e5fa8"/><text x="70" y="142" font-size="11">2.6</text><text x="62" y="206" font-size="11">YE23</text>
+        <rect x="140" y="116.4" width="52" height="73.6"  fill="#0e5fa8"/><text x="150" y="110" font-size="11">4.6</text><text x="142" y="206" font-size="11">YE24</text>
+        <rect x="220" y="71.6"  width="52" height="118.4" fill="#0e5fa8"/><text x="230" y="65" font-size="11">7.4</text><text x="222" y="206" font-size="11">YE25</text>
+        <rect x="300" y="44.4"  width="52" height="145.6" fill="#0e5fa8"/><text x="310" y="38" font-size="11">9.1</text><text x="295" y="206" font-size="11">3/31/26</text>
+        <!-- tiny bar PCF revenue recognized FY25 0.116 -->
+        <rect x="392" y="188.1" width="52" height="1.9" fill="#b3392e"/>
+        <text x="375" y="178" font-size="11" fill="#b3392e" font-weight="bold">$0.116B</text>
+        <text x="370" y="206" font-size="11">PCF rev '25</text>
+        <text x="60" y="26" font-size="11.5" fill="#0e5fa8" font-weight="bold">Deferred revenue balance ($B) [P] &mdash; cash banked&hellip;</text>
+        <text x="280" y="170" font-size="11" fill="#b3392e">&hellip;vs revenue recognized [S, call]</text>
+      </svg>
+      <div class="cnote">~90% of PCF cash arrives upfront [S, CFO]; revenue recognizes ratably over ~20-yr IRU/lease terms [P, 10-K]. FY25 FCF ex-SI $1.04B <i>included</i> +$2.67B of this build &mdash; underlying FCF &asymp; <b>&minus;$1.6B</b> [C]. Never quote headline FCF to this PM without the asterisk.</div>
+    </div>
+  </div>
+  <div class="chartwrap">
+    <div class="ctitle">3.5 Cumulative PCF contract value ($B TCV) and the mix crossover</div>
+    <svg viewBox="0 0 1020 200" width="100%">
+      <line x1="40" y1="160" x2="560" y2="160" stroke="#999"/>
+      <rect x="60"  y="110" width="70" height="50"  fill="#0b7a5c"/><text x="80" y="103" font-size="11">5.0</text><text x="60" y="176" font-size="10.5">Aug '24</text>
+      <rect x="170" y="75"  width="70" height="85"  fill="#0b7a5c"/><text x="190" y="68" font-size="11">8.5</text><text x="170" y="176" font-size="10.5">Feb '25</text>
+      <rect x="280" y="60"  width="70" height="100" fill="#0b7a5c"/><text x="295" y="53" font-size="11">10+</text><text x="280" y="176" font-size="10.5">Oct '25</text>
+      <rect x="390" y="30"  width="70" height="130" fill="#0b7a5c"/><text x="405" y="23" font-size="11">~13</text><text x="390" y="176" font-size="10.5">Feb '26</text>
+      <text x="60" y="195" font-size="10.5" fill="#666">MSFT &middot; Meta &middot; AWS &middot; Google &middot; Anthropic &middot; neoclouds [P]. Zero unsigned deals in long-term guidance [S, Q1'26 call].</text>
+      <!-- crossover mini -->
+      <text x="640" y="30" font-size="12" font-weight="bold">Q1 2026 business revenue mix [P]:</text>
+      <rect x="640" y="45" width="249" height="26" fill="#0b7a5c"/><text x="648" y="63" font-size="12" fill="#fff">Strategic $1,246M (+9% YoY)</text>
+      <rect x="640" y="78" width="240" height="26" fill="#b3392e"/><text x="648" y="96" font-size="12" fill="#fff">Legacy $1,198M (&minus;14% YoY)</text>
+      <text x="640" y="128" font-size="11" fill="#666">Growth bucket passed the decline bucket for the first</text>
+      <text x="640" y="142" font-size="11" fill="#666">time &mdash; the crossover quarter. NA enterprise &minus;0.8% YoY;</text>
+      <text x="640" y="156" font-size="11" fill="#666">Business segment +1% QoQ (first sequential growth print).</text>
+    </svg>
+  </div>
+</section>
+
+<!-- ================= 4 SERVICES ================= -->
+<section id="s4">
+  <h2><span class="secno">4</span>What they actually sell (plain English)</h2>
+  <div class="tldr"><b class="tag">TLDR</b> &mdash; Lumen sells distance. Either raw (dark fiber, conduit, wavelengths &mdash; you light it / we light it), retail (enterprise internet, VPN, voice), or now productized (NaaS &mdash; buy a connection like a cloud subscription) and bespoke (PCF &mdash; we build you a private fiber highway, you prepay). Growth products are ~half of business revenue and growing single digits; everything else declines 9&ndash;16%/yr.</div>
+  <table>
+    <tr><th style="width:16%">Product</th><th style="width:30%">What it is, simply</th><th style="width:24%">Who buys &amp; why</th><th style="width:10%">Trend</th><th>Bucket / numbers [P]</th></tr>
+    <tr><td><b>Dark fiber &amp; conduit (IRUs)</b></td><td>Raw glass in the ground, leased for ~20 yrs ("indefeasible right of use"). Customer brings own electronics. Conduit = the empty pipes you can pull more cable through later.</td><td>Hyperscalers, carriers, governments who want control + capacity certainty.</td><td class="up">&uarr; +$112M in '24 and again '25</td><td>Strategic/Grow. The basis of PCF.</td></tr>
+    <tr><td><b>Wavelengths</b></td><td>A private high-capacity light channel (100G/400G) on Lumen-lit fiber between two points.</td><td>Cloud/AI players, banks, carriers needing guaranteed point-to-point bandwidth without owning fiber.</td><td class="fl">Volume &uarr;, price &minus;11%/yr industry-wide [S]</td><td>Strategic/Grow.</td></tr>
+    <tr><td><b>IP transit / DIA / CDN-ish</b></td><td>Big-pipe internet access for enterprises and carriers; Lumen runs one of the largest internet backbones (legacy Level 3, AS3356).</td><td>Anyone moving serious traffic; ISPs buying upstream.</td><td class="up">&uarr; IP +$74M in '25</td><td>Strategic/Grow.</td></tr>
+    <tr><td><b>VPN / MPLS, Ethernet</b></td><td>The old way enterprises connected offices: private, carrier-managed circuits.</td><td>Legacy enterprise WANs &mdash; actively being replaced by SD-WAN over cheap broadband.</td><td class="dn">&darr;&darr; VPN &minus;$344M, Ethernet &minus;$116M in '25 alone</td><td>Legacy/Nurture: &minus;15%/yr three straight years.</td></tr>
+    <tr><td><b>TDM voice, private line</b></td><td>Landline-era phone and dedicated copper circuits.</td><td>Stragglers; milked for cash ("Harvest").</td><td class="dn">&darr;&darr; voice &minus;$162M in '25</td><td>Legacy/Harvest: &minus;9 to &minus;17%/yr.</td></tr>
+    <tr><td><b>Consumer copper + voice (retained)</b></td><td>What's left of CenturyLink consumer after the fiber sale: DSL-class broadband + home phone, run for cash.</td><td>Rural/legacy households; churning to cable &amp; FWA.</td><td class="dn">&darr;&darr; subs &minus;21%/yr; rev &minus;19/&minus;20%</td><td>Run-off annuity, no growth story. Will resell AT&amp;T FWA.</td></tr>
+    <tr><td><b>NaaS / "Lumen Digital"</b></td><td>Network-as-a-service: spin up/down connections (internet, Ethernet, cloud on-ramps) via portal/API in minutes, consumption-priced &mdash; the "AWS console for the network."</td><td>Enterprises wanting cloud-like agility; multi-cloud shops.</td><td class="up">&uarr; ~2,500 customers; ports +35% QoQ (Q1'26)</td><td>Small $ today; digital revenue target $0.8&ndash;0.9B by 2030 [P, ID deck]. Alkira ($475M) buys the control plane.</td></tr>
+    <tr><td><b>PCF (Private Connectivity Fabric)</b></td><td>Bespoke mega-deal: Lumen designs/builds/leases private fiber routes between a customer's data centers &mdash; new construction, over-pulls through existing conduit, or existing dark fiber &mdash; ~20-yr terms, ~90% cash upfront, Lumen keeps O&amp;M (~10% of TCV).</td><td>Hyperscalers + AI labs racing to wire AI data centers; buying <i>time</i> and rights-of-way more than fiber.</td><td class="up">&uarr;&uarr; ~$13B TCV signed</td><td>Recurring PCF revenue guided $500&ndash;600M by 2029 [P, deck]. The cash engine.</td></tr>
+    <tr><td><b>Security / edge / managed</b></td><td>DDoS protection, managed network/security services, edge compute.</td><td>Existing enterprise base; attach products.</td><td class="fl">Mixed</td><td>Strategic, small.</td></tr>
+  </table>
+</section>
+
+<!-- ================= 5 MOAT ================= -->
+<section id="s5">
+  <h2><span class="secno">5</span>Why customers pick Lumen — and the honest moat assessment</h2>
+  <div class="tldr"><b class="tag">TLDR</b> &mdash; The moat is in the dirt, not in the services. Rights-of-way + 340K route miles + empty conduit = you can deliver an intercity fiber route in months when a greenfield build takes 3&ndash;5+ years of permits. Lit services (waves, IP, VPN) have weak moats and deflating prices. So: real scarcity asset, commodity service layer on top.</div>
+  <div class="grid2">
+    <div class="card">
+      <h4>REAL MOAT (defensible)</h4>
+      <ul>
+        <li><b>Rights-of-way &amp; conduit in the ground.</b> Assembled over decades (railroad-era routes, Level 3's 1990s build). Permitting/easements are the bottleneck for any rival build &mdash; you cannot CapEx your way past county-by-county approvals quickly. Empty conduit lets Lumen "over-pull" new high-density cable (Corning deal: 2x fibers in existing pipes) at a fraction of greenfield cost/time. <i>This is exactly what the hyperscalers are paying $13B for.</i></li>
+        <li><b>Scale &amp; uniqueness of routes.</b> &gt;340K route miles, ~163K on-net buildings, unique intercity paths [P]. ~2.3x Zayo's route miles [S; definitions vary].</li>
+        <li><b>Speed as proof.</b> Builds ran 130% of 2025 target; hyperscaler quote: "never experienced this kind of speed before with a telco" [S, calls].</li>
+        <li><b>Switching costs on sold IRUs.</b> A 20-year IRU with the customer's own electronics on it doesn't churn.</li>
+      </ul>
+    </div>
+    <div class="card">
+      <h4>NOT A MOAT (be honest, he'll test this)</h4>
+      <ul>
+        <li><b>Lit transport pricing:</b> 100G wavelength prices &minus;11% CAGR industry-wide [S, TeleGeography]; everyone (Zayo +5,000 route miles, AT&amp;T, Verizon, LSC, Ziply) is building AI corridors at once &mdash; 2001-glut echo, and Level 3 was the poster child then.</li>
+        <li><b>Enterprise services:</b> VPN/MPLS being structurally replaced by SD-WAN over commodity broadband (an ex-Accenture PM has lived this migration); no pricing power.</li>
+        <li><b>Customer concentration/sophistication:</b> hyperscalers are the most brutal procurement organizations alive, and Lumen's own 10-K admits some "have developed infrastructure that has reduced their reliance on our network" [P].</li>
+        <li><b>No software moat (yet):</b> NaaS is promising but sub-scale; Alkira is a buy-vs-build admission.</li>
+      </ul>
+    </div>
+  </div>
+  <div class="goodbox"><b>One-line moat answer for the interview:</b> "Lumen's durable asset is right-of-way scarcity and empty conduit &mdash; it sells <i>time-to-capacity</i> to AI buyers who can't wait five years for permits. The service layer on top is largely commodity, which is why I underwrite the asset and the contracts, not the P&amp;L momentum."</div>
+</section>
+
+<!-- ================= 6 PCF ================= -->
+<section id="s6">
+  <h2><span class="secno">6</span>PCF &amp; the AI story — mechanics you must know cold</h2>
+  <div class="tldr"><b class="tag">TLDR</b> &mdash; ~$13B of contracts; ~90% cash upfront; revenue recognized over ~20 years (only $116M in 2025); cash funds the network build (capex $4.37B in '25) and debt paydown; recurring PCF revenue reaches $500&ndash;600M by 2029. It is closer to prepaid infrastructure leasing + construction than to a SaaS-like revenue stream &mdash; and management refuses to disclose deal-level cash-in/cash-out or margins.</div>
+  <table>
+    <tr><th>Mechanic</th><th>Fact</th><th>So what</th></tr>
+    <tr><td>Contract form</td><td>IRUs (~20-yr exclusive use) on new/existing fiber+conduit; dark-fiber deals are <i>lease</i> accounting, capacity deals ASC 606 ratable [P, 10-K]</td><td>Most of the $13B never shows up in "remaining performance obligations" ($6.0B at YE25) &mdash; backlog is understated, but so is near-term revenue.</td></tr>
+    <tr><td>Cash timing</td><td>~90% upfront [S, CFO Q4'25]; majority of contract cash within 3&ndash;4 yrs of signing [P, 10-K]. ~$870M PCF cash in Q1'26 alone [S]</td><td>Deferred revenue $2.6B&rarr;$9.1B in 27 months. This is why headline FCF looks fine while underlying FCF is negative.</td></tr>
+    <tr><td>P&amp;L timing</td><td>FY25 PCF revenue $116M; Q1'26 $78M (incl. $32M one-time milestone) [S, calls]</td><td>&lt;1% of TCV hits revenue per year. Anyone valuing the $13B as revenue is wrong by ~20x.</td></tr>
+    <tr><td>Costs</td><td>Capex +$1.1B in '25 ("majority&hellip; PCF"); ~$1B of '26 capex is PCF; EBITDA-dilutive during build [P/S]</td><td>Net economics undisclosed. Kerrisdale's hostile estimate: ~$21M/yr recurring profit on the first $5B [S] &mdash; never rebutted with numbers.</td></tr>
+    <tr><td>Demand</td><td>$4.5B signed in TTM to Feb '26; Anthropic added Feb '26; zero unsigned deals in long-term guide; Q1'26 added no new dollars [P/S]</td><td>Pipeline is upside; a multi-quarter stall is a kill-switch (see &sect;10).</td></tr>
+    <tr><td>Strategic payoff</td><td>Funds 17M&rarr;47M intercity fiber miles by 2028 (~58M by 2031); network is <i>retained</i> &mdash; leases, not asset sales [P]</td><td>The real prize: a modernized national backbone paid for largely with other people's money, plus excess capacity to sell later.</td></tr>
+  </table>
+</section>
+
+<!-- ================= 7 SCORECARD ================= -->
+<section id="s7">
+  <h2><span class="secno">7</span>Sycamore three-attribute scorecard</h2>
+  <div class="tldr"><b class="tag">TLDR</b> &mdash; (a) Better business: qualified pass &mdash; scarce asset, stabilizing core, but financial strength is 4 months old. (b) Valuation disparity: marginal at $8.49 &mdash; this is the leg that weakened as the stock doubled; my margin of safety came from the $6 entry. (c) Improving fundamentals: pass &mdash; mostly executed, not promised. Downside first, always.</div>
+  <table>
+    <tr><th style="width:22%">Attribute</th><th style="width:12%">Verdict</th><th>Evidence for</th><th>Evidence against</th></tr>
+    <tr><td><b>(a) Better business / above-avg financial strength</b></td><td class="fl">QUALIFIED PASS</td>
+      <td>Irreplaceable route/conduit asset (AT&amp;T paid ~2x book for the fiber unit); Business EBITDA margin 46%; Strategic&gt;Legacy crossover; B2/B&minus;/B post-upgrade; near-zero maturities to 2030; 5.25x covenant vs ~3.5x actual.</td>
+      <td>4 straight years of EBITDA decline; negative book equity; underlying FCF negative ex-prepayments; $2.3B pension/OPEB off-ratio; "strength" dates to Feb 2026.</td></tr>
+    <tr><td><b>(b) Exploitable valuation disparity</b></td><td class="fl">MARGINAL at $8.49<br>(CLEAR at my ~$6 entry)</td>
+      <td>~6.3x guided EBITDA vs FYBR take-out 8.4x, UNIT 10x, Zayo/CCI ~7.2x; asset marks (~$47K/route-mile [C, crude]) roughly cover EV; 0 sell-side Buys = sentiment floor.</td>
+      <td>Trades above consensus PT (~$8) and Morningstar FVE (~$7.50) after +96% TTM; bear path &asymp; $3.30 (&minus;61%) [C]; equity is a levered stub behind $11.3B net debt.</td></tr>
+    <tr><td><b>(c) Prospect of improving fundamentals</b></td><td class="up">PASS (strongest leg)</td>
+      <td>Debt fix executed; cost program ahead ($400M+ run-rate exiting '25 &rarr; $700M '26 &rarr; $1B+ '27); $13B contracted; PF EBITDA growth guided '26; biz revenue growth '28 / total '29; margin to mid-30%s by '30; CEO insider buying.</td>
+      <td>Inflection promised twice before and missed; 2026 reported EBITDA still declines vs reported '25; disclosure taxonomy changed right as "Grow" stalled (yellow flag).</td></tr>
+  </table>
+</section>
+
+<!-- ================= 8 OPPORTUNITIES ================= -->
+<section id="s8">
+  <h2><span class="secno">8</span>Opportunities (what can go right)</h2>
+  <div class="grid2">
+    <div class="card"><h4>1. PCF PIPELINE = FREE OPTIONALITY</h4>Long-term guidance includes <b>zero</b> unsigned PCF deals [S, Q1'26 call]. Every incremental hyperscaler/neocloud/AI-lab deal is upside; $4.5B signed in the last twelve months suggests flow, not a one-off. Inference-era traffic (vs training) would broaden demand to metro/edge where Lumen has 22M fiber miles.</div>
+    <div class="card"><h4>2. COST-OUT + MIX = MARGIN INFLECTION</h4>$1B+ run-rate savings exiting 2027 on a ~$10.5&ndash;11B PF revenue base [P]; copper decommissioning, ERP consolidation done in phases 1&ndash;2. Path from 27% to mid-30%s margin is cost-and-mix math, not heroic growth: every year Legacy shrinks, the blended margin mechanically improves.</div>
+    <div class="card"><h4>3. RE-RATE TO INFRASTRUCTURE MULTIPLES</h4>If EBITDA stabilizes ~$3.3&ndash;3.4B by 2028 and the market pays fiber-infra marks (7.5&ndash;8x vs 6.3x today): equity ~$15&ndash;16.50/share [C]. Catalysts: 2&ndash;3 quarters of PF EBITDA growth, leverage into the 3.0&ndash;3.5x target band, possible index/ratings momentum (another upgrade to B+/BB&minus; territory).</div>
+    <div class="card"><h4>4. ASSET MONETIZATION REPLAY</h4>The AT&amp;T deal proved asset value &gt; book. AT&amp;T's pending NetworkCo equity-partner sale (~late '26) gives a fresh public mark for FTTH assets. Remaining levers: ~5% retained Quantum, data-center-adjacent real estate/central offices, further non-core sales. Filings keep referencing "evaluation of other potential transactions" [P].</div>
+    <div class="card"><h4>5. NaaS / LUMEN DIGITAL</h4>Small but compounding (~2,500 customers, ports +35% QoQ); Alkira gives a real multi-cloud control plane and cuts $100&ndash;200M future capex [P/S]. Digital revenue target $800&ndash;900M by 2030. If it works, it's the first software-ish margin stream in the company's history.</div>
+    <div class="card"><h4>6. BALANCE-SHEET FLYWHEEL</h4>Interest expense &minus;~45% (~$500M/yr); 2026 cash-tax <i>refund</i> $350&ndash;450M; capex drops &gt;$1B/yr post-FTTH; PCF prepayments keep funding paydown ($870M in Q1'26 "most&hellip; used to pay down debt" [S]). Each turn of deleveraging transfers EV from creditors to the equity stub.</div>
+  </div>
+</section>
+
+<!-- ================= 9 RISKS ================= -->
+<section id="s9">
+  <h2><span class="secno">9</span>Risks (ranked — downside first)</h2>
+  <div class="tldr"><b class="tag">TLDR</b> &mdash; #1 is the FCF illusion unwinding before EBITDA inflects; #2 is the core melting faster than the pivot; #3 is hyperscaler capex risk on a concentrated book. Bear case &asymp; $3.30 (&minus;61%) [C]. The stock saw $3.37 within the last year &mdash; this downside is not theoretical.</div>
+  <table>
+    <tr><th style="width:4%">#</th><th style="width:24%">Risk</th><th>Specifics</th></tr>
+    <tr><td>1</td><td><b>FCF illusion unwinds</b></td><td>Prepayments taper (majority of contract cash lands within 3&ndash;4 yrs of signing) while capex stays $3.2&ndash;3.4B; reported FCF reverts toward the negative underlying. 2026's headline $1.9&ndash;2.1B already includes $729M one-time AT&amp;T allocation + ~$400M tax refund &mdash; organic is ~$0.8&ndash;1.0B at best [C].</td></tr>
+    <tr><td>2</td><td><b>Core decline outruns the pivot</b></td><td>Legacy &minus;14% YoY; VPN/Ethernet structurally replaced; Mid-Market &minus;10&ndash;11% six straight quarters; Wholesale &minus;8%; copper consumer subs &minus;21%/yr. Management's own timeline concedes no total revenue growth until 2029.</td></tr>
+    <tr><td>3</td><td><b>Hyperscaler capex cycle / concentration</b></td><td>~$13B TCV across a handful of counterparties whose 2026 capex (~$700B Big-4) is increasingly debt-financed; Microsoft cancelled DC leases in early 2025 as precedent [S]; 10-K: demand shifts "could reduce or even eliminate future PCF profitability" [P].</td></tr>
+    <tr><td>4</td><td><b>Fiber supply glut (2001 redux)</b></td><td>Zayo, AT&amp;T, Verizon, LSC, Ziply all building AI corridors; waves already &minus;11%/yr; Level 3's own history is the cautionary tale. Over-supply hits renewal pricing on the lit business even if PCF IRUs are locked.</td></tr>
+    <tr><td>5</td><td><b>PCF margin opacity</b></td><td>Management refused cash-in/out disclosure twice [S]; build-phase EBITDA dilution admitted; if net margins are construction-like, the "$13B" headline materially overstates value creation.</td></tr>
+    <tr><td>6</td><td><b>Adverse mix post-AT&amp;T</b></td><td>Sold the only growing consumer asset (~$460M direct EBITDA [C]) at a buyer-friendly ~$1,438/location (vs FYBR ~$2,400, Ziply ~$3,788 [S]); kept the copper run-off and stranded costs the 10-K itself flags.</td></tr>
+    <tr><td>7</td><td><b>Leverage re-rises mechanically</b></td><td>$11.3B net debt over $2.5B EBITDA = ~4.5x; negative equity; pension/OPEB $2.3B outside the ratio; 2031+ wall ($11.2B) priced at 6.875&ndash;8.5%.</td></tr>
+    <tr><td>8</td><td><b>Credibility &amp; tail items</b></td><td>Two missed inflection promises; disclosure-taxonomy change; undisclosed cash tax on the sale gain (Q1'26 tax expense $377M, taxes payable +$308M); MN DOR assessment; lead-cable case revived <i>without</i> prejudice (5th Cir., 1/30/26) [P].</td></tr>
+  </table>
+</section>
+
+<!-- ================= 10 KILL SWITCHES ================= -->
+<section id="s10">
+  <h2><span class="secno">10</span>Kill-switches — what makes me sell (falsifiable)</h2>
+  <div class="tldr"><b class="tag">TLDR</b> &mdash; A Sycamore answer needs pre-committed exits. Mine: guide cut below $3.1B / PF base; PCF stalls 4+ quarters or any cancellation; prepayment engine stops while capex continues; decline re-accelerates past &minus;5%; leverage re-crosses 4x.</div>
+  <table>
+    <tr><th style="width:6%">#</th><th style="width:38%">Trigger</th><th style="width:34%">Test</th><th>Check where</th></tr>
+    <tr><td>K1</td><td>2026 EBITDA guide cut, or FY26 lands below PF '25 (~$2.9B)</td><td>Any cut below the $3.1B floor</td><td>Quarterly 8-Ks</td></tr>
+    <tr><td>K2</td><td>PCF stalls or reverses</td><td>Total still ~$13B at YE26 (Q1'26 already added $0), or any disclosed cancellation/renegotiation</td><td>8-Ks, calls</td></tr>
+    <tr><td>K3</td><td>Prepayments stop, spend continues</td><td>Deferred-rev build &lt;~$300M/qtr with capex &gt;$800M/qtr and organic FCF negative</td><td>10-Q cash flow</td></tr>
+    <tr><td>K4</td><td>Core re-accelerates down</td><td>Business revenue worse than &minus;5% YoY for 2 straight qtrs, or Strategic growth &lt;+5%</td><td>8-K revenue tables</td></tr>
+    <tr><td>K5</td><td>Leverage &gt;4x (company basis) or new secured/priming debt</td><td>&mdash;</td><td>10-Q, 8-Ks</td></tr>
+    <tr><td>K6</td><td>Hyperscaler capex guide-downs (leading indicator for K2)</td><td>2+ of MSFT/META/AMZN/GOOGL cut capex guides</td><td>Their earnings</td></tr>
+    <tr><td>K7</td><td>Cost program slips</td><td>&lt;$700M run-rate exiting 2026</td><td>Q4'26 release</td></tr>
+    <tr><td>K8</td><td>2028 milestones pushed at future guidance events; PCF recurring rev tracking &lt;$400M run-rate by late '28</td><td>&mdash;</td><td>Investor events</td></tr>
+    <tr><td>K9</td><td>Johnson or Stansbury departs; another disclosure-taxonomy change</td><td>&mdash;</td><td>8-Ks</td></tr>
+    <tr><td>K10</td><td>Wave/dark-fiber price erosion accelerates well past ~11%/yr or a rival undercuts a PCF renewal</td><td>&mdash;</td><td>TeleGeography, trade press</td></tr>
+  </table>
+</section>
+
+<!-- ================= 11 POSITION STORY ================= -->
+<section id="s11">
+  <h2><span class="secno">11</span>My position — the narrative arc for the interview</h2>
+  <div class="tldr"><b class="tag">TLDR</b> &mdash; Bought ~$6 in 2H 2025 when the AT&amp;T deal was signed-but-unclosed and the market was paying ~5.5x for a balance-sheet fix that contracts had largely de-risked. Up ~42%. Today I'm a disciplined holder, not a buyer: the valuation-disparity leg has compressed, my kill-switches are armed, and I'd add back near $6.50&ndash;7.00.</div>
+  <div class="grid3">
+    <div class="card"><h4>WHY I BOUGHT (~$6, 2H 2025)</h4>
+      <ul style="margin:0;padding-left:18px">
+        <li><b>Downside first:</b> at ~$6, EV &asymp; $17B &asymp; ~5.5x guided EBITDA with the AT&amp;T $5.75B signed &mdash; creditor risk (the thing that took it to $1) was being contractually retired, but equity still priced like distress.</li>
+        <li><b>Variant view:</b> consensus correctly called PCF cash "low quality" but missed the point &mdash; prepayments fund the rebuild and the paydown, extending the equity option for free while the mix crossover approached.</li>
+        <li><b>Falsifiable plan:</b> deal closes + upgrades + PF EBITDA growth = re-rate; deal breaks = exit.</li>
+      </ul></div>
+    <div class="card"><h4>WHAT HAPPENED SINCE</h4>
+      <ul style="margin:0;padding-left:18px">
+        <li>Thesis events landed: close (2/2/26), all-three upgrades, $2.5B more PCF + Anthropic, cost-out beat, Strategic&gt;Legacy crossover.</li>
+        <li>Ran to $11.95 (Nov '25) &mdash; <i>ahead</i> of fundamentals; Q1'26 adjusted-EPS miss (&minus;$0.47 vs &minus;$0.06) knocked it back ~8%.</li>
+        <li>Marked +~42% at $8.49. I did not add above $9 &mdash; the disparity leg was gone.</li>
+      </ul></div>
+    <div class="card"><h4>WHAT I DO NOW</h4>
+      <ul style="margin:0;padding-left:18px">
+        <li><b>Hold</b> a position sized for a &minus;60% bear case; kill-switches K1&ndash;K10 armed and monitored quarterly.</li>
+        <li><b>Add</b> discipline: ~$6.50&ndash;7.00 (back under fair-value marks, ~5.5&ndash;6x).</li>
+        <li><b>Trim/exit:</b> on K-triggers, or into euphoria &gt;~8x guided EBITDA (~$12&ndash;13) without PF growth confirmation.</li>
+        <li>Frame to Sycamore: <i>this is a positive-change special situation with an asset floor &mdash; it earns a small position, not a core holding, until the inflection prints twice.</i></li>
+      </ul></div>
+  </div>
+</section>
+
+<!-- ================= 12 ALBERS PREP ================= -->
+<section id="s12">
+  <h2><span class="secno">12</span>James Albers prep — likely questions &amp; strong answers</h2>
+  <div class="tldr"><b class="tag">TLDR</b> &mdash; CS degree + Accenture/IBM consulting means: he has personally lived the enterprise migration OFF Lumen's legacy products (MPLS&rarr;SD-WAN, on-prem&rarr;cloud), he will smell tech-washing instantly, and he'll structure-test you consultant-style ("so what's the answer in one sentence?"). Lead every answer with the conclusion, quote numbers with their source basis, and volunteer the bear case before he does.</div>
+
+  <div class="qa"><div class="q">Q1. "Explain PCF to me like I'm technical. What is Lumen actually delivering?"</div>
+    <div class="why">Why he asks: tests whether you understand the product or just the headline. His CS background means he knows what dark fiber is.</div>
+    <div class="a"><b>A:</b> Custom private fiber routes between AI data centers, sold as ~20-year IRUs. Three flavors: greenfield construction, "over-pulls" (new high-density Corning cable through Lumen's <i>existing empty conduit</i> &mdash; the cheap, fast kind; the Oct '25 $1B tranche was "primarily existing conduit"), and existing dark fiber. Customer typically lights it with their own optics; Lumen keeps O&amp;M &mdash; about 10% of contract value. ~90% of cash is prepaid; revenue recognizes ratably over the term, dark-fiber deals as <i>lease</i> revenue. So economically it's prepaid infrastructure leasing with a construction phase &mdash; not a service contract.</div>
+    <div class="trap">Trap: calling PCF "AI revenue growth." It added $116M to 2025 revenue. Say "cash engine and network-rebuild funding," never "growth engine" — management itself called it static.</div></div>
+
+  <div class="qa"><div class="q">Q2. "Why don't Microsoft and Meta just build their own fiber? They build everything else."</div>
+    <div class="why">Why he asks: the moat question in hyperscaler clothing.</div>
+    <div class="a"><b>A:</b> Time, not money. Greenfield intercity fiber means county-by-county permits, easements, railroad/DOT crossings &mdash; 3&ndash;5+ years before you pull cable. Lumen's rights-of-way and empty conduit are already in the ground, so it delivers in months (builds ran 130% of the 2025 target; a hyperscaler said they'd "never experienced this kind of speed before with a telco"). In an AI race where a data center costs billions and sits dark without connectivity, prepaying Lumen is buying schedule certainty. <i>But</i> &mdash; concede it &mdash; they do self-build where it's worth it; Lumen's 10-K admits some hyperscalers "developed infrastructure that has reduced their reliance on our network." The moat is route scarcity, not customer captivity.</div></div>
+
+  <div class="qa"><div class="q">Q3. "Walk me through free cash flow. Is this company actually generating cash?"</div>
+    <div class="why">Why he asks: THE test. Headline FCF is the most misleading number in the name.</div>
+    <div class="a"><b>A (lead with the honest answer):</b> Not organically &mdash; yet. FY25 FCF ex-specials was $1.04B, but that <i>includes</i> a $2.67B deferred-revenue build from PCF prepayments; strip it and underlying FCF was roughly <b>negative $1.6B</b> because capex ran $4.37B during the build-out. The 2026 "raise" to $1.9&ndash;2.1B is one-time items: $729M of AT&amp;T proceeds classified as operating cash plus a ~$400M tax refund &mdash; organic is ~$0.8&ndash;1.0B and only after capex steps down post-FTTH. My thesis explicitly does NOT rest on near-term FCF; it rests on prepaid contracts funding the transition and the 2027&ndash;28 EBITDA inflection. If the prepayment engine stops before the inflection (my kill-switch K3), I'm out.</div>
+    <div class="trap">Trap: quoting the $1.9&ndash;2.1B guide unqualified. That's an instant credibility loss with this PM.</div></div>
+
+  <div class="qa"><div class="q">Q4. "You said margin of safety. The stock doubled. Where's the margin of safety at $8.49?"</div>
+    <div class="why">Why he asks: Sycamore's first principle is limiting permanent loss of capital; he'll push on whether you confuse a winning trade with a safe holding.</div>
+    <div class="a"><b>A:</b> Honest answer: the margin of safety was at my entry, not at today's price. At ~$6 the EV was ~5.5x guided EBITDA with the AT&amp;T contract signed &mdash; I was paying nothing for PCF optionality. At $8.49 the stock is above consensus (~$8) and Morningstar (~$7.50) marks, and my scenario tree is roughly &minus;61%/+90% &mdash; symmetric, not protected. What remains is an asset floor: ~$16B+ of fiber/conduit replacement-style value against a $20B EV, proven by AT&amp;T paying ~2x book. That protects the <i>enterprise</i>, and the equity only via continued deleveraging. So I hold with armed exits; I would not initiate here &mdash; I'd initiate at $6.50&ndash;7.</div></div>
+
+  <div class="qa"><div class="q">Q5. "Legacy is declining 14% a year. You really believe revenue grows in 2029? They've promised this before."</div>
+    <div class="why">Why he asks: tests whether you've audited management's track record.</div>
+    <div class="a"><b>A:</b> I don't take it on faith &mdash; they promised "stability in 2024" at the 2023 Investor Day and missed by 10 points of revenue; in Feb 2025 the CFO said 2026 EBITDA &gt; $3.5B and the actual guide came in $3.1&ndash;3.3B. So I anchor on arithmetic instead: Strategic (51% of business revenue) growing +9% against Legacy (49%) declining &minus;14% implies the blend turns positive around 2028 <i>if</i> both rates merely hold &mdash; that's the same math management publishes, and it's checkable every quarter (my K4). What I give them credit for is what they've <i>executed</i>: the debt fix, the cost-out beats, the asset sale. Promises I monitor; execution I underwrite.</div></div>
+
+  <div class="qa"><div class="q">Q6. "Isn't selling the consumer fiber business selling the crown jewel to pay the mortgage?"</div>
+    <div class="why">Why he asks: the deal is genuinely two-sided; tests intellectual honesty.</div>
+    <div class="a"><b>A:</b> Partly yes &mdash; they sold their only growing consumer asset, ~$460M of direct EBITDA, at ~$1,438/location when Frontier went for ~$2,400 and Ziply ~$3,788 &mdash; MoffettNathanson said it plainly: one buyer negotiating with a motivated seller. But the counterfactual mattered more: $17.8B of debt with superpriority paper on top. The sale retired the entire superpriority stack, cut interest ~45%, got three upgrades, and removed &gt;$1B/yr of consumer fiber capex Lumen couldn't really afford. They traded the best asset for survival plus strategic focus. I'd rather own a de-risked enterprise pure-play than a levered hybrid praying on refis.</div></div>
+
+  <div class="qa"><div class="q">Q7. "What's NaaS actually worth? Sounds like a portal on top of the same network." </div>
+    <div class="why">Why he asks: ex-IBM/Accenture &mdash; he has seen a hundred 'digital transformation' decks; he'll test for buzzword tolerance.</div>
+    <div class="a"><b>A:</b> Today, roughly nothing in the valuation &mdash; and that's the right way to hold it. Real traction is small but compounding: ~2,500 customers, ports +35% QoQ, and they paid $475M for Alkira because their own control plane wasn't good enough &mdash; an honest buy-vs-build admission. Management targets $800&ndash;900M digital revenue by 2030. I model zero; if it works it's a free call option on the first software-margin stream this company has ever had.</div></div>
+
+  <div class="qa"><div class="q">Q8. "What kills this? Give me the bear case better than a short seller would."</div>
+    <div class="why">Why he asks: Sycamore downside-first culture; also tests whether you've read the actual bear work (Kerrisdale).</div>
+    <div class="a"><b>A:</b> Three-step bear: (1) PCF is construction-margin, one-time cash &mdash; Kerrisdale put recurring profit on the first $5B at ~$21M/yr and management has twice refused to disclose cash-in/cash-out; (2) hyperscaler capex is debt-financed and cyclical &mdash; one digestion phase (Microsoft already cancelled DC leases in early '25) and new TCV stops while Lumen still owes the builds; (3) meanwhile the core declines &minus;3% organically with wavelength prices &minus;11%/yr as five competitors overbuild the same corridors &mdash; 2001 redux, and this company's own Level 3 DNA is the case study. End state: EBITDA grinds to ~$2.7B, prepayments dry up, leverage re-crosses 4.5x, equity is a $3 stub. That's why my position is small and my exits are pre-committed.</div></div>
+
+  <div class="qa"><div class="q">Q9. "Why does this trade below Verizon and AT&T on EBITDA? Maybe it should trade lower."</div>
+    <div class="why">Why he asks: tests relative-value reasoning vs naive 'it's cheaper' pitches.</div>
+    <div class="a"><b>A:</b> The discount is deserved on current numbers &mdash; T/VZ have stable EBITDA, dividends, and investment-grade ratings; Lumen has none of those. The mispricing argument is about the <i>direction and mix</i>, not the level: a stabilized Lumen is more infrastructure-like than a telco &mdash; the right comps become Uniti (10x), the Frontier take-out (8.4x), Zayo/CCI (~7.2x) &mdash; and the path from 6.3x to 7.5&ndash;8x is worth ~$6&ndash;8/share on the equity stub. The multiple follows the inflection; it doesn't anticipate it, which is exactly why the entry price was the whole game.</div></div>
+
+  <div class="qa"><div class="q">Q10. "You mentioned Anthropic signed with them. How much is that worth?"</div>
+    <div class="why">Why he asks: checks for headline-vs-substance discipline (and it's topical).</div>
+    <div class="a"><b>A:</b> Unknown &mdash; and that's the honest answer. Lumen has never broken out per-customer deal sizes within the ~$13B; Anthropic was announced at the Feb '26 Investor Day as a network-expansion selection with no dollar figure. Any per-logo attribution you read is inference. What it evidences is demand breadth: the buyer set has widened from the big-four clouds to AI labs and neoclouds.</div></div>
+
+  <div class="qa"><div class="q">Q11. "The 2024 restructuring — what actually happened and who paid?"</div>
+    <div class="why">Why he asks: tests credit literacy; the equity story is incomprehensible without the debt story.</div>
+    <div class="a"><b>A:</b> An out-of-court amend-and-extend with &gt;$15B participating: maturities pushed from a $9.4B 2027 wall to 2029&ndash;30, $1.325B new money at 10.5&ndash;11%, ~$260M of fees to the ad-hoc group, and holdouts stripped of covenants and collateral. S&amp;P rated it Selective Default; Fitch RD. Shareholders weren't diluted &mdash; the cost came as coupon, collateral, and structural subordination. Crucially, the most expensive layer (superpriority) was fully retired with AT&amp;T proceeds in Feb '26 &mdash; that's the "cleanup" that justified the upgrades and is why today's 3.5x net leverage is real, not cosmetic.</div></div>
+
+  <div class="qa"><div class="q">Q12. "As an ex-consultant I helped clients leave MPLS. Why won't the same thing happen to everything Lumen sells?"</div>
+    <div class="why">Why he asks: his lived experience IS the bear case on the legacy book.</div>
+    <div class="a"><b>A:</b> It will &mdash; and the thesis assumes it. VPN/Ethernet decline &minus;15%/yr is the SD-WAN migration you ran, and I model it continuing to roughly zero. The distinction is the layer: what got commoditized is the <i>managed service</i> on top of connectivity. What Lumen monetizes in PCF is the layer below &mdash; physical route scarcity &mdash; which SD-WAN can't substitute because packets still need glass between cities. The pitch isn't "the services come back"; it's "the dirt gets repriced while the services melt on schedule."</div></div>
+
+  <div class="qa"><div class="q">Q13. "What does your monitoring process look like if we owned this?"</div>
+    <div class="why">Why he asks: Sycamore process question &mdash; analysts who can't operationalize a thesis don't get hired.</div>
+    <div class="a"><b>A:</b> Ten pre-committed kill-switches (show &sect;10), checked against each 8-K/10-Q: the four load-bearing ones are EBITDA guide vs the $2.9B PF base, PCF deal flow (stall &ge;4 quarters = exit), the deferred-revenue build vs capex (the prepayment engine), and Business revenue decline staying better than &minus;5%. Plus an external dashboard: hyperscaler capex guides as the leading indicator, and TeleGeography wave pricing for glut signals. Every number ties to a primary source &mdash; I keep the conflict ledger (company "3.8x" vs my computed 3.46x vs PR "&lt;4x") so I never mix bases in a memo.</div></div>
+
+  <div class="warnbox"><b>Traps to avoid in the room:</b> (1) never quote headline FCF or the $1.9&ndash;2.1B guide without the one-time asterisk; (2) never call PCF "revenue growth" or Lumen an "AI company"; (3) Q1'26 EPS confusion &mdash; adjusted &minus;$0.47 is <i>worse</i> than GAAP &minus;$0.20 because adjusted excludes the $596M sale gain; (4) don't cite the "2029 EBITDA $3.6B / FCF $500M" framework floating around &mdash; it's not in the Investor Day deck (verified against the primary PDF); the real targets are directional; (5) leverage has three bases &mdash; quote one and label it; (6) route-mile comparisons across carriers use inconsistent definitions (Lumen's own 10-K says so).</div>
+</section>
+
+<!-- ================= 13 CHEAT CARD ================= -->
+<section id="s13">
+  <h2><span class="secno">13</span>Cheat card — 20 numbers to know cold</h2>
+  <table>
+    <tr><th>#</th><th>Number</th><th>What it is</th><th>Basis</th></tr>
+    <tr><td>1</td><td class="num">$8.49 / ~$8.7B / ~$20.1B</td><td>Price (6/11/26) / market cap / EV</td><td>[S]/[C]</td></tr>
+    <tr><td>2</td><td class="num">$12.4B / &minus;5%</td><td>FY25 revenue / YoY</td><td>[P]</td></tr>
+    <tr><td>3</td><td class="num">$3.36B / 27.1%</td><td>FY25 adj. EBITDA / margin (4th straight down year)</td><td>[P]</td></tr>
+    <tr><td>4</td><td class="num">$3.1&ndash;3.3B vs ~$2.9B</td><td>2026 EBITDA guide vs pro-forma '25 base (the "growth" claim)</td><td>[P]/[C]</td></tr>
+    <tr><td>5</td><td class="num">$1.04B vs &minus;$1.6B</td><td>FY25 headline FCF vs underlying ex-prepayments</td><td>[P]/[C]</td></tr>
+    <tr><td>6</td><td class="num">+$2.67B / $9.1B</td><td>FY25 deferred-revenue build / balance at 3/31/26</td><td>[P]</td></tr>
+    <tr><td>7</td><td class="num">~$13B / $116M</td><td>PCF TCV signed / PCF revenue recognized FY25</td><td>[P]/[S]</td></tr>
+    <tr><td>8</td><td class="num">~90% / ~20 yrs / ~10%</td><td>PCF cash upfront / IRU term / O&amp;M share of TCV</td><td>[S, calls]</td></tr>
+    <tr><td>9</td><td class="num">$500&ndash;600M by 2029</td><td>PCF recurring revenue target</td><td>[P, ID deck]</td></tr>
+    <tr><td>10</td><td class="num">$5.75B / ~$1,438</td><td>AT&amp;T FTTH sale / per enabled location (vs FYBR ~$2,400, Ziply ~$3,788)</td><td>[P]/[S]</td></tr>
+    <tr><td>11</td><td class="num">$17.8B &rarr; $13.1B</td><td>Debt, YE25 &rarr; 3/31/26 (superpriority stack fully retired)</td><td>[P]</td></tr>
+    <tr><td>12</td><td class="num">~3.5x [C] / 3.8x CFO / &lt;4x PR</td><td>Net leverage, three bases &mdash; label whichever you quote</td><td>mixed</td></tr>
+    <tr><td>13</td><td class="num">$31M/$20M/$380M/$1.28B</td><td>Maturities 2026/27/28/29 &mdash; runway is empty</td><td>[P]</td></tr>
+    <tr><td>14</td><td class="num">B2 / B&minus; / B</td><td>Moody's/S&amp;P/Fitch after Feb '26 upgrades (from SD/RD in 2024!)</td><td>[P]</td></tr>
+    <tr><td>15</td><td class="num">$1,246M vs $1,198M</td><td>Q1'26 Strategic vs Legacy &mdash; the crossover quarter (+9% vs &minus;14%)</td><td>[P]</td></tr>
+    <tr><td>16</td><td class="num">$400M+ &rarr; $700M &rarr; $1B+</td><td>Cost-out run-rate exiting '25 / '26 / '27</td><td>[P]</td></tr>
+    <tr><td>17</td><td class="num">340K / 17M&rarr;47M</td><td>Route miles / intercity fiber miles '25 &rarr; '28 target</td><td>[P]</td></tr>
+    <tr><td>18</td><td class="num">2028 / 2029 / mid-30%s</td><td>Business rev growth / total rev growth / 2030 margin target</td><td>[P, deck]</td></tr>
+    <tr><td>19</td><td class="num">~$26.5B / 3 cuts</td><td>Goodwill written off '18&ndash;'25 / dividend cuts to zero</td><td>[P]/[C]</td></tr>
+    <tr><td>20</td><td class="num">&minus;$0.47 vs &minus;$0.06</td><td>Q1'26 adj. EPS vs consensus (stock &minus;8% over two sessions)</td><td>[P]/[S]</td></tr>
+  </table>
+</section>
+
+<footer>
+  Prepared June 11&ndash;12, 2026 from the LUMN deep dive in <code>research/LUMN_deep_dive_2026-06-11.md</code> (same repo), which carries full source URLs and the data-conflict ledger.
+  Primary sources: FY2025 10-K (filed 2/20/26); Q1 2026 10-Q &amp; 8-K (5/5/26); Q4/FY2025 8-K (2/3/26); FTTH pro-forma 8-K (4/16/26); 2026 Investor Day deck (2/25/26); TSA 8-K (3/28/24); ratings release (2/23/26).
+  Secondary: earnings-call transcripts (Motley Fool/Insider Monkey), Light Reading, TeleGeography, Kerrisdale (short), MarketBeat/stockanalysis.com, Morningstar page state.
+  Stock-price path in &sect;2 is approximate and for narrative only. All [C] items are my computations from cited inputs &mdash; auditable, no hidden heuristics.
+  <br><br><i>Models and notes are the analyst's own work product, rebuilt and internalized by the analyst; this dashboard is a study aid.</i>
+</footer>
+
+</main>
+</body>
+</html>
