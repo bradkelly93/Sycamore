@@ -1,0 +1,777 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>LUMN — Sycamore Interview Prep Deck</title>
+<style>
+  :root{
+    --ink:#0f1b2d; --ink2:#1a2332; --muted:#5b6776; --paper:#ffffff;
+    --line:#dde3ea; --accent:#0e5fa8; --green:#0b7a5c; --red:#b3392e; --amber:#9a6b00;
+    --tldr:#eef4fb; --good:#ecf7f1; --goodln:#bfe0cf; --warn:#fdf3e7; --warnln:#ecd3a8;
+    --say:#fffaf0; --sayln:#e8d4a8;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html,body{height:100%}
+  body{font-family:-apple-system,Segoe UI,Helvetica,Arial,sans-serif;background:#0a0f17;color:var(--ink);overflow:hidden}
+  #stage{position:fixed;inset:0;display:flex;align-items:center;justify-content:center}
+  .slide{display:none;width:100vw;height:100vh;background:var(--paper);padding:46px 64px 60px;flex-direction:column;position:relative}
+  .slide.active{display:flex}
+  .slide.divider{background:var(--ink);color:#fff;justify-content:center}
+  .slide.divider .secnum{font-size:15px;letter-spacing:3px;color:#6fa8d6;margin-bottom:12px}
+  .slide.divider h1{font-size:46px;font-weight:800;line-height:1.1;max-width:1100px}
+  .slide.divider .sub{margin-top:18px;font-size:18px;color:#b8c4d4;max-width:1000px;line-height:1.5}
+  h2{font-size:31px;font-weight:800;color:var(--ink);border-bottom:4px solid var(--ink);padding-bottom:10px;margin-bottom:18px;line-height:1.12}
+  h2 .k{color:var(--accent)}
+  .body{flex:1;overflow:auto;font-size:20px;line-height:1.5}
+  .body.sm{font-size:18px}
+  .body.xs{font-size:16.5px}
+  ul{margin:0 0 0 26px} li{margin:9px 0}
+  li b{color:var(--ink)}
+  .lead{font-size:23px;line-height:1.45;margin-bottom:14px}
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:22px}
+  .grid3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:16px}
+  .card{border:1px solid var(--line);border-radius:9px;padding:16px 18px;background:#fbfcfe}
+  .card h3{font-size:16px;color:var(--accent);margin-bottom:8px;letter-spacing:.3px}
+  .card.green{background:var(--good);border-color:var(--goodln)} .card.green h3{color:var(--green)}
+  .card.red{background:#fdeeee;border-color:#e7c3bf} .card.red h3{color:var(--red)}
+  .card.amber{background:var(--warn);border-color:var(--warnln)} .card.amber h3{color:var(--amber)}
+  .kpi{font-size:30px;font-weight:800;line-height:1.05}
+  .kpi small{font-size:13px;color:var(--muted);font-weight:600;display:block;margin-top:3px}
+  .tldr{background:var(--tldr);border-left:6px solid var(--accent);padding:14px 18px;border-radius:0 7px 7px 0;font-size:19px;line-height:1.5}
+  .say{background:var(--say);border:1px solid var(--sayln);border-left:6px solid var(--amber);padding:13px 17px;border-radius:0 7px 7px 0;margin-top:14px;font-size:17px;line-height:1.5}
+  .say b.tag{color:var(--amber);letter-spacing:1.5px;font-size:12px;display:block;margin-bottom:5px}
+  .warnbox{background:var(--warn);border:1px solid var(--warnln);border-left:6px solid var(--amber);padding:12px 16px;border-radius:0 7px 7px 0;font-size:17px;margin-top:12px;line-height:1.45}
+  .goodbox{background:var(--good);border:1px solid var(--goodln);border-left:6px solid var(--green);padding:12px 16px;border-radius:0 7px 7px 0;font-size:17px;margin-top:12px;line-height:1.45}
+  table{border-collapse:collapse;width:100%;font-size:16.5px}
+  th{background:var(--ink);color:#fff;text-align:left;padding:8px 11px;font-weight:600}
+  td{border-bottom:1px solid var(--line);padding:8px 11px;vertical-align:top}
+  tr:nth-child(even) td{background:#f7f9fb}
+  .up{color:var(--green);font-weight:700}.dn{color:var(--red);font-weight:700}.fl{color:var(--amber);font-weight:700}
+  .pill{display:inline-block;font-size:12px;font-weight:700;border-radius:11px;padding:2px 11px;margin-left:6px}
+  .pill.g{background:#d9efe4;color:var(--green)}.pill.r{background:#fbdad7;color:var(--red)}.pill.a{background:#f6e6c4;color:var(--amber)}
+  footer{position:absolute;bottom:16px;left:64px;right:64px;display:flex;justify-content:space-between;align-items:center;font-size:13px;color:var(--muted);border-top:1px solid var(--line);padding-top:8px}
+  footer .tag{font-weight:700;color:var(--ink)}
+  #bar{position:fixed;top:0;left:0;height:4px;background:var(--accent);z-index:50;transition:width .2s}
+  #nav{position:fixed;bottom:14px;right:18px;z-index:50;font-size:12px;color:#7c8a99;background:rgba(255,255,255,.85);border:1px solid var(--line);border-radius:20px;padding:5px 13px}
+  .q{font-weight:800;font-size:19px;color:var(--ink);margin-bottom:3px}
+  .qwhy{font-size:14.5px;color:var(--red);margin-bottom:6px;font-style:italic}
+  .qa-a{font-size:16.5px;line-height:1.45}
+  .two-col{column-count:2;column-gap:30px}
+  .small{font-size:14px;color:var(--muted)}
+  svg text{font-family:Helvetica,Arial,sans-serif}
+  .legend{font-size:13px;color:var(--muted);margin-top:4px}
+  @media print{
+    body{overflow:visible;background:#fff}
+    #stage{position:static}
+    .slide{display:flex !important;page-break-after:always;height:7.5in;width:100%;border:1px solid #ccc;margin-bottom:8px}
+    #bar,#nav{display:none}
+  }
+</style>
+</head>
+<body>
+<div id="bar"></div>
+<div id="nav">◀ ▶ to navigate · <span id="counter"></span></div>
+<div id="stage">
+
+<!-- 1 TITLE -->
+<section class="slide divider active">
+  <div class="secnum">RESEARCH ANALYST INTERVIEW · PREP DECK</div>
+  <h1>Lumen Technologies (NYSE: LUMN)<br>A Position Case Study</h1>
+  <div class="sub">Prepared for the conversation with James Albers, Sycamore Capital · Data as of June 11, 2026 (close $8.49)<br>
+  Position: entered ~$6.00 in 2H 2025, ~+42% · Framed on Sycamore's three attributes, downside first.</div>
+</section>
+
+<!-- 2 THE PITCH -->
+<section class="slide">
+  <h2>The pitch in five sentences</h2>
+  <div class="body sm">
+    <ul>
+      <li>Lumen owns something money alone can't replicate — decades of <b>rights-of-way and empty conduit</b> between US cities — and the AI build-out turned that into <b>~$13B of prepaid, 20-year contracts</b> from Microsoft, Meta, AWS, Google and Anthropic, who are buying <b>time</b> because a greenfield fiber route takes 5 years of permits they don't have.</li>
+      <li>That customer cash, plus the <b>$5.75B sale of consumer fiber to AT&T</b>, cut debt from <b>$17.8B → $13.1B</b>, retired the entire distressed-era capital structure, earned upgrades from all three rating agencies, and left almost no maturities until 2031 — the balance sheet that nearly killed this company in 2023 is fixed.</li>
+      <li>The legacy telecom still melts ~9–14%/yr, but it's now under half the mix and the <b>crossover already happened</b> — Strategic revenue passed Legacy in Q1 2026 — with a $1B cost program driving a pro-forma EBITDA inflection this year and guided revenue growth by 2028–29.</li>
+      <li>I bought at <b>~$6</b> when the market priced the equity as a distressed stub and the AT&T deal had already de-risked it; at $8.49 I <b>hold</b> a position sized for the real bear case (~$3), with pre-committed exits if PCF signings stall, the EBITDA guide cracks, or leverage re-crosses 4x.</li>
+      <li>The asymmetry from here is a re-rate from <b>~6.3x toward fiber-infrastructure multiples of 7.5–8x</b> — roughly <b>$15–16/share</b> — if management delivers two consecutive quarters of the inflection it has already contracted the cash to fund.</li>
+    </ul>
+    <div class="say"><b class="tag">FRAME IT AS</b> A positive-change special situation with an asset floor — explicitly <i>not</i> a classic quality-value name. It earns a small position with hard invalidation triggers, not a core holding.</div>
+  </div>
+</section>
+
+<!-- 3 SNAPSHOT -->
+<section class="slide">
+  <h2>Snapshot</h2>
+  <div class="body">
+    <div class="grid3">
+      <div class="card"><h3>PRICE / VALUE</h3><div class="kpi">$8.49<small>6/11/26 · +96% TTM · 52-wk $3.37–$11.95</small></div>
+        <div style="margin-top:10px;font-size:16px">Mkt cap ~$8.7B · EV ~$20.1B<br>EV / 2026E EBITDA <b>~6.3x</b><br>Consensus ~Hold, PT $7.9–8.3<br>Morningstar FVE ~$7.50</div></div>
+      <div class="card"><h3>P&amp;L (FY2025)</h3><div class="kpi">$12.4B<small>revenue, −5%</small></div>
+        <div style="margin-top:10px;font-size:16px">Adj. EBITDA $3.36B (−14.7%), 27.1% margin<br>2026 guide $3.1–3.3B<br>Normalized run-rate <b>~$770–780M/qtr</b><br>Net loss $(1.74)B</div></div>
+      <div class="card"><h3>BALANCE SHEET (3/31/26)</h3><div class="kpi">$13.1B<small>debt (from $17.8B)</small></div>
+        <div style="margin-top:10px;font-size:16px">Net debt ~$11.3B · leverage ~3.5x<br>Ratings B2 / B− / B (upgraded)<br>Maturities: $31M'26 / $20M'27 / $380M'28<br>Pension+OPEB unfunded ~$2.3B</div></div>
+    </div>
+    <div class="tldr" style="margin-top:18px"><b>One line:</b> a melting legacy telecom using a one-time gusher of AI prepayments and asset sales to pay off its debt and rebuild as a fiber-infrastructure / network-orchestration company — the bet is whether the new business grows faster than the old one melts.</div>
+  </div>
+</section>
+
+<!-- 4 THE HOUSE -->
+<section class="slide">
+  <h2>The core mental model: a balance-sheet play, not an income-statement play</h2>
+  <div class="body sm">
+    <div class="lead">A house worth $500k with a $450k mortgage: the owner's stake is $50k. Pay the mortgage to $350k and the stake <b>triples to $150k</b> — the house never improved.</div>
+    <ul>
+      <li>The "house" (whole business EV) is ~$20B. Two years ago ~$18B belonged to lenders; the equity was a thin, near-zero slice (the stock hit ~$1 in 2023).</li>
+      <li>Debt has been cut to ~$13B — and <b>every billion that disappears slides to the shareholders' side.</b> The stock went $1 → $8.50 mostly from <i>that</i>, not from the report card improving.</li>
+      <li><b>Whose money paid the mortgage?</b> Not profits — the AT&T sale ($5.75B) and AI prepayments (~$13B). The income statement says "earns almost nothing"; the bank account says "billions came in, debt is melting." Both true.</li>
+    </ul>
+    <div class="warnbox"><b>The catch (= the whole bull/bear debate):</b> the analogy assumes the house holds value while you pay down the mortgage. If the business shrinks as fast as the debt does, you're just bailing water. Every kill-switch is one quarterly question: <i>is the house losing value slower than the mortgage is shrinking?</i></div>
+  </div>
+</section>
+
+<!-- SECTION: WHAT IS THIS COMPANY -->
+<section class="slide divider">
+  <div class="secnum">PART 1</div>
+  <h1>What is this company?</h1>
+  <div class="sub">History → what they sell → the strategic rebrand.</div>
+</section>
+
+<!-- 5 HISTORY -->
+<section class="slide">
+  <h2>History: three telcos, ~$26.5B of write-offs, a near-death, and a pivot</h2>
+  <div class="body xs">
+    <table>
+      <tr><th>Era</th><th>What happened</th></tr>
+      <tr><td><b>1930s–2017</b><br>The roll-up</td><td>Rural phone co (CenturyTel/CenturyLink) buys <b>Qwest</b> (2011, $22B) then <b>Level 3</b> (2017, ~$34B w/ debt) → becomes a fiber-backbone + Baby Bell conglomerate. Mix flips to ~75% business.</td></tr>
+      <tr><td><b>2013 / 2019 / Nov 2022</b><br>Value destruction</td><td>Dividend cut 26%, then 54%, then <b>eliminated</b>. <span class="dn">~$26.5B of cumulative goodwill written off 2018–2025</span> — ~3x today's market cap. Buyback at $6.07 right before the stock fell toward $1.</td></tr>
+      <tr><td><b>2023</b><br>Near-death</td><td>~$20B debt, bonds marked ~67¢, stock ~$1. <b>March 2024 TSA restructuring</b> = coercive amend-and-extend; S&P rated it <b>Selective Default</b>, Fitch <b>RD</b>. Bought time, didn't fix EBITDA decline.</td></tr>
+      <tr><td><b>Jul–Aug 2024</b><br>The pivot lands</td><td>Microsoft PCF deal → "$5B of new AI business" → ~$13B by Feb 2026 (MSFT, Meta, AWS, Google, Anthropic). Stock ~4x off the ~$1 low.</td></tr>
+      <tr><td><b>May 2025 → Feb 2 2026</b><br>De-risking</td><td><b>Sells consumer fiber to AT&T for $5.75B.</b> ~$4.8B retires the entire superpriority stack. Debt $17.8B→$13.1B; <span class="up">all three agencies upgrade</span> (B2/B−/B).</td></tr>
+    </table>
+    <div class="warnbox"><b>Own this before he raises it:</b> management has over-promised the inflection <i>twice</i> (2023 ID: "stability in 2024" → got −10% rev; Feb 2025: "2026 EBITDA &gt;$3.5B" → guided $3.1–3.3B). Rebuttal: the 2025–26 <i>deliverables</i> were executed, not promised.</div>
+  </div>
+</section>
+
+<!-- 6 WHAT THEY SELL -->
+<section class="slide">
+  <h2>What they sell: <span class="k">Legacy → Bridge → Pivot</span></h2>
+  <div class="body xs">
+    <table>
+      <tr><th>Bucket</th><th>Products</th><th>Why the customer needs it</th><th>Trend</th></tr>
+      <tr><td><b style="color:var(--red)">LEGACY</b><br>(run for cash)</td><td>TDM voice, private line; VPN/MPLS, Ethernet; consumer copper</td><td>Real needs (branch connectivity, home internet) — but the <i>solution</i> got replaced (SD-WAN, cable, FWA). Incumbency + contract lag, not loyalty.</td><td class="dn">↓↓ −9 to −20%/yr</td></tr>
+      <tr><td><b style="color:var(--accent)">BRIDGE</b><br>(grows today)</td><td>Dark fiber &amp; conduit (IRUs); wavelengths; IP/internet backbone; security</td><td>Durable, traffic-driven needs. Control + capacity certainty for hyperscalers/carriers/enterprises.</td><td class="fl">↑ vol, price −11%/yr (waves)</td></tr>
+      <tr><td><b style="color:var(--green)">PIVOT</b><br>(the future bet)</td><td>PCF (AI fiber); NaaS / Lumen Digital / Alkira</td><td>AI clusters must behave as one computer; buy connectivity like cloud. Selling <b>time-to-capacity</b> &amp; orchestration.</td><td class="up">↑↑ ~$13B PCF · NaaS +25–35% QoQ</td></tr>
+    </table>
+    <div class="goodbox"><b>The line:</b> "Customer needs don't die — <i>solutions</i> die. Homes still need internet, branches still need connectivity; that's why Legacy melts forever. The pivot works because the new businesses sell the one thing software can't substitute: <b>physical routes between places, available now.</b>"</div>
+  </div>
+</section>
+
+<!-- 7 NEEDS DONT DIE -->
+<section class="slide">
+  <h2>The reframe that runs through everything</h2>
+  <div class="body">
+    <div class="grid2">
+      <div class="card red"><h3>WHAT DIES</h3>
+        <ul><li>The <b>solution</b>, not the need. CDs died; music didn't.</li>
+        <li>MPLS/VPN → SD-WAN once apps moved to cloud (the migration <b>James personally ran</b>).</li>
+        <li>Copper DSL → cable + fixed wireless.</li>
+        <li>Lit transport gets commoditized by better optics (−11%/yr).</li></ul></div>
+      <div class="card green"><h3>WHAT SURVIVES</h3>
+        <ul><li>The <b>conduit</b> and rights-of-way — technology-agnostic. Any cable (solid/hollow-core) pulls through the same hole.</li>
+        <li>The scarcity is <b>permits + easements + time</b>, which no software update manufactures.</li>
+        <li>That's why the thesis underwrites the <b>dirt</b>, not the services.</li></ul></div>
+    </div>
+    <div class="say"><b class="tag">FOR JAMES (ex-Accenture/IBM)</b> The same Cloud 1.0 shift that gutted Lumen's old business (apps→cloud killed site-to-site MPLS) is what creates the new one in Cloud 2.0 (AI scatters compute → East-West demand on infrastructure Lumen owns). The wheel that ran them over is now carrying them.</div>
+  </div>
+</section>
+
+<!-- 8 REBRAND -->
+<section class="slide">
+  <h2>The strategic rebrand: parts provider → network-orchestration platform</h2>
+  <div class="body sm">
+    <div class="grid2">
+      <div class="card red"><h3>PARTS PROVIDER (the past)</h3>"Buy a circuit, a wavelength, a port." Customer (or an SI) assembles it. Value accrues to the assembler. <b>Deflates ~11%/yr.</b> Priced like a melting telco — ~6x EBITDA.</div>
+      <div class="card green"><h3>ORCHESTRATION PLATFORM (the bet)</h3>"Tell me the outcome; I'll make the parts cooperate." Buy the <i>result</i>, not components. Value accrues to the orchestrator. Priced like infra-software — 8x+.</div>
+    </div>
+    <div class="tldr" style="margin-top:14px">The twist that makes Lumen's version different: it wants to be <b>the orchestrator that also owns the parts.</b> Pure-software orchestrators (Megaport) rent everyone's transport and are margin-capped; failed telcos owned assets but couldn't build software. Lumen's bet = combine the asset (won) with the software (the hard part).</div>
+    <div class="warnbox"><b>This reframe IS the re-rate thesis</b> — a 6x melting telco vs an 8x+ platform is ~$6–8/share on the equity stub. And it's a rebrand the whole industry has attempted and mostly failed. So: underwrite the parts, treat the orchestration as the option.</div>
+  </div>
+</section>
+
+<!-- SECTION: DEMAND -->
+<section class="slide divider">
+  <div class="secnum">PART 2</div>
+  <h1>The demand thesis: Cloud 2.0</h1>
+  <div class="sub">Why the network becomes valuable again — East-West, multi-cloud, and the moat.</div>
+</section>
+
+<!-- 9 NORTH SOUTH EAST WEST -->
+<section class="slide">
+  <h2>North-South vs East-West: the bottleneck moves from the room to the road</h2>
+  <div class="body sm">
+    <div class="grid2">
+      <div class="card"><h3>NORTH-SOUTH (Cloud 1.0)</h3>Premises → one cloud. Simple: one fat pipe. The scarce thing was the <b>meet-me room</b> (Equinix won this). <b>~$12B TAM, &lt;1% growth</b>, commoditized, "race to the bottom."</div>
+      <div class="card green"><h3>EAST-WEST (Cloud 2.0)</h3>Data center ↔ data center, cloud ↔ cloud, at 400G–1.6T. AI scatters compute (sited where power is). The scarce thing becomes <b>high-bandwidth transport between points</b> — which Lumen owns. <b>~$11B TAM, 13% CAGR</b> (~$58B global w/ Alkira).</div>
+    </div>
+    <div class="goodbox" style="margin-top:14px"><b>The bet:</b> "When the bottleneck was the meeting room, the room-owner (Equinix) won. When it becomes the road between rooms, the road-owner wins — and that's me." All the growth is East-West, exactly where Lumen's intercity assets sit. CFO (TD Cowen): a bigger East-West market is "a global TAM because you don't need to own the network" — the software layer (Alkira) is licensable abroad.</div>
+  </div>
+</section>
+
+<!-- 10 MULTI CLOUD -->
+<section class="slide">
+  <h2>Hybrid &amp; multi-cloud: the foundational premise</h2>
+  <div class="body sm">
+    <div class="lead">If everything lived in <b>one</b> cloud, you'd barely need a network. Because computing is <b>scattered</b> (many clouds + on-prem + edge + SaaS) — permanently — you need a huge mesh of connectivity <i>between</i> the pieces.</div>
+    <ul>
+      <li><b>Why permanent:</b> no single cloud wins everything; lock-in avoidance; M&A sprawl; sovereignty/latency; cost (some workloads repatriate); AI + open-source scatter it further.</li>
+      <li><b>Why it's Lumen's whole opportunity:</b> it creates the East-West problem, AND a <b>neutrality gap no cloud will fill</b> (AWS won't build you a great private link to Azure), AND the complexity that needs orchestration.</li>
+      <li><b>Structural alignment:</b> clouds want you in one cloud (lock-in); Lumen wins from fragmentation. It sells "Switzerland between the clouds" — the one place it's genuinely <i>cloud</i>-neutral.</li>
+    </ul>
+    <div class="warnbox"><b>Risk:</b> right trend ≠ captured value. The clouds (Cloud WAN, AWS interconnect), Equinix and Megaport all want the neutral-connector role too. Underwrite the East-West <i>transport</i> (owned assets); stay skeptical on the orchestration layer (contested).</div>
+  </div>
+</section>
+
+<!-- 11 MOAT -->
+<section class="slide">
+  <h2>The moat is in the dirt — "selling time"</h2>
+  <div class="body sm">
+    <div class="grid2">
+      <div class="card green"><h3>REAL MOAT (defensible)</h3>
+        <ul><li><b>Rights-of-way &amp; empty conduit</b> assembled over decades. Permitting is the bottleneck — you can't CapEx past county approvals. Greenfield = 3–5 yrs; an over-pull = months.</li>
+        <li>340K route miles, 163K on-net buildings; unique intercity paths.</li>
+        <li>This is exactly what hyperscalers pay $13B for: <b>time-to-capacity.</b></li></ul></div>
+      <div class="card red"><h3>NOT A MOAT (concede it)</h3>
+        <ul><li>Lit-transport pricing (waves −11%/yr; everyone overbuilding AI routes — 2001-glut echo, and Level 3 was the poster child).</li>
+        <li>Enterprise services (SD-WAN substitution — no pricing power).</li>
+        <li>NaaS software (sub-scale; Megaport got there first).</li></ul></div>
+    </div>
+    <div class="say"><b class="tag">ONE-LINE MOAT ANSWER</b> "Lumen's durable asset is right-of-way scarcity and empty conduit — it sells time-to-capacity to AI buyers who can't wait five years for permits. The service layer on top is largely commodity, which is why I underwrite the asset and the contracts, not the P&L momentum."</div>
+  </div>
+</section>
+
+<!-- 12 COMPETITION -->
+<section class="slide">
+  <h2>Competitive map: who owns which piece of the path</h2>
+  <div class="body xs">
+    <table>
+      <tr><th>Type</th><th>Owns</th><th>Lacks</th><th>Examples</th></tr>
+      <tr><td>Neutral real estate</td><td>The meet-me rooms; neutrality network-effect</td><td>No long-haul transport</td><td><b>Equinix</b>, Digital Realty</td></tr>
+      <tr><td>Software-only (asset-light)</td><td>The orchestration software</td><td>Owns <i>no</i> network — rents it all; margin-capped</td><td><b>Megaport</b>, Aviatrix</td></tr>
+      <tr><td>The clouds</td><td>The destination + on-ramp products</td><td>Need partners to extend reach; partner <i>and</i> predator</td><td>AWS, Azure, Google</td></tr>
+      <tr><td><b>Transport + software</b></td><td>Long-haul + metro fiber + software</td><td>Not neutral; software sub-scale</td><td><b>Lumen</b></td></tr>
+    </table>
+    <div class="goodbox"><b>Lumen's claim:</b> only player with the physical reach of an asset owner <i>and</i> the cloud-native software — "no pure-play competitor." <b>Caveat:</b> on on-ramps Lumen is the <i>insurgent</i>, walking into Equinix's and Megaport's house. The bet is the AI era moves the bottleneck from the neutral room to owned transport.</div>
+    <div class="warnbox"><b>"Carrier-agnostic" ≠ "carrier-neutral."</b> Lumen's software can ride any carrier off-net (agnostic in <i>capability</i>) but has an obvious incentive to keep traffic on its own fiber (not <i>neutral</i> in incentive). A customer wanting genuine neutrality still goes to Equinix.</div>
+  </div>
+</section>
+
+<!-- SECTION: PCF -->
+<section class="slide divider">
+  <div class="secnum">PART 3</div>
+  <h1>PCF — the cash engine</h1>
+  <div class="sub">~$13B of prepaid AI fiber contracts. The mechanics, the economics, the cliff.</div>
+</section>
+
+<!-- 13 PCF MECHANICS -->
+<section class="slide">
+  <h2>PCF mechanics — know these cold</h2>
+  <div class="body sm">
+    <ul>
+      <li><b>What it is:</b> custom private fiber routes between a customer's data centers, sold as ~20-year IRUs (exclusive-use rights). Three flavors: greenfield build, <b>over-pull</b> (new cable through existing conduit), or existing dark fiber.</li>
+      <li><b>Dark fiber ↔ PCF:</b> dark fiber is the <i>product</i>; DCI is the <i>use case</i>; PCF is the <i>commercial wrapper</i>. PCF is the dark-fiber-&-conduit business, productized for the AI era and sold prepaid.</li>
+      <li><b>Cash:</b> ~<b>90% paid upfront</b>; revenue recognized ratably over ~20 yrs (lease accounting). Lumen keeps O&M (~10% of contract value).</li>
+      <li><b>Why 20 years:</b> matches the fiber's useful life (buyer gets ownership economics + capex treatment + price lock + regulatory avoidance, without becoming a telco or re-litigating easements).</li>
+    </ul>
+    <div class="say"><b class="tag">EXPLAIN PCF SIMPLY</b> "AI companies' robot brains live in different cities and need to talk fast. They prepaid us almost the whole 20 years up front to build private superhighways between their brains. We still own the roads, they use them for 20 years, and we get paid to sweep them."</div>
+  </div>
+</section>
+
+<!-- 14 PCF ECONOMICS -->
+<section class="slide">
+  <h2>PCF economics &amp; the prepayment cliff (Investor Day slide 46)</h2>
+  <div class="body xs">
+    <div style="display:flex;gap:24px;align-items:flex-start">
+      <div style="flex:0 0 470px">
+        <svg viewBox="0 0 470 250" width="470">
+          <line x1="40" y1="200" x2="460" y2="200" stroke="#999"/>
+          <text x="6" y="40" font-size="11" fill="#666">$2.5B</text><text x="6" y="120" font-size="11" fill="#666">$1.25B</text>
+          <!-- cash collected bars: 2.53,1.75,2.0,1.25,0.55,0.15 scale ~62px/B -->
+          <rect x="55"  y="43"  width="46" height="157" fill="#0e5fa8"/><text x="60" y="37" font-size="11">2.5</text>
+          <rect x="120" y="91"  width="46" height="109" fill="#0e5fa8"/><text x="127" y="85" font-size="11">1.75</text>
+          <rect x="185" y="76"  width="46" height="124" fill="#0e5fa8"/><text x="195" y="70" font-size="11">2.0</text>
+          <rect x="250" y="123" width="46" height="77"  fill="#7fa8cc"/><text x="258" y="117" font-size="11">1.25</text>
+          <rect x="315" y="166" width="46" height="34"  fill="#c47b73"/><text x="322" y="160" font-size="11">0.55</text>
+          <rect x="380" y="191" width="46" height="9"   fill="#b3392e"/><text x="388" y="185" font-size="11">0.15</text>
+          <text x="60" y="216" font-size="11">'25</text><text x="125" y="216" font-size="11">'26</text><text x="190" y="216" font-size="11">'27</text>
+          <text x="255" y="216" font-size="11">'28</text><text x="320" y="216" font-size="11">'29</text><text x="385" y="216" font-size="11">'30</text>
+          <text x="120" y="240" font-size="12" fill="#b3392e" font-weight="bold">PCF cash collected ($B) — the cliff after 2027</text>
+        </svg>
+      </div>
+      <div style="flex:1">
+        <ul>
+          <li><b>~$8.5B cash in vs ~$4.3B build cost</b> (2025–30, midpoints) → <span class="up">~50% gross cash margin</span>. This rebuts the "it's just break-even construction" bear case <i>at the aggregate level.</i></li>
+          <li>But PCF <b>revenue recognized was only $116M in FY25</b> — &lt;1%/yr of the $13B (ratable over 20 yrs). Anyone valuing the $13B as revenue is wrong by ~20x.</li>
+          <li><b>Capex peaks in 2027</b> (~$1.25–1.45B) — 2027 capex will look heavy, then drops.</li>
+          <li>PCF recurring revenue target: <b>$500–600M by 2029</b>.</li>
+        </ul>
+        <div class="warnbox"><b>The catch:</b> cash is prepaid &amp; front-loaded. The window runs ~through 2028, then the gusher dries up — so the EBITDA inflection &amp; new signings must arrive before then. <b>Deal-level margins still undisclosed.</b></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- 15 GREENFIELD VS OVERPULL -->
+<section class="slide">
+  <h2>Greenfield vs over-pull: margin today vs moat tomorrow</h2>
+  <div class="body sm">
+    <div class="grid2">
+      <div class="card green"><h3>OVER-PULL (harvest the moat)</h3>New cable through conduit Lumen already owns. Skips the expensive 70–80% (digging/permits). <b>High margin, fast, low risk.</b> But extends nothing — harvests existing footprint.</div>
+      <div class="card amber"><h3>GREENFIELD (plant new scarcity)</h3>New routes into power-sited AI corridors (e.g., NorthLine, Seattle–Minneapolis). Lower margin, overrun risk (Lumen eats it — cash already spent). But <b>creates tomorrow's over-pull inventory</b> + "build once, sell twice" (spare strands at ~100% margin).</div>
+    </div>
+    <div class="goodbox"><b>Does the hyperscaler care?</b> Mostly no — they buy endpoints, latency, diversity, a delivery date. They force greenfield only when the route doesn't exist yet — which conveniently is how Lumen extends its moat into the new power-driven geography of AI. <b>You want a mix:</b> greenfield to plant scarcity, over-pulls to harvest it. The 2027 capex peak = the greenfield investment phase.</div>
+  </div>
+</section>
+
+<!-- SECTION: THE PIVOT -->
+<section class="slide divider">
+  <div class="secnum">PART 4</div>
+  <h1>The pivot (Act 3): the orchestration platform</h1>
+  <div class="sub">NaaS, Alkira, and whether Lumen can do what every telco has failed to do.</div>
+</section>
+
+<!-- 16 NAAS ALKIRA -->
+<section class="slide">
+  <h2>The platform: Lumen Connect (front door) + Alkira (engine room)</h2>
+  <div class="body sm">
+    <div class="grid2">
+      <div class="card"><h3>LUMEN CONNECT — the storefront</h3>Self-service portal: see, order, change, monitor, pay. The <b>experience layer.</b> Lumen-built, table-stakes. (The Uber app.)</div>
+      <div class="card green"><h3>ALKIRA ($475M, ~$275–300M net) — the control plane</h3>Cloud-native orchestration engine that designs/runs networks across <i>any</i> cloud. The <b>intelligence layer.</b> <b>Bought</b> because it's the hard part telcos can't build. (Uber's dispatch engine.)</div>
+    </div>
+    <ul style="margin-top:12px">
+      <li>NaaS = "buy connectivity like an EC2 instance": API-first, on-demand, minutes not weeks. 20–30-day cycle → minutes. <b>"Port = platform."</b></li>
+      <li>Alkira closes Q3 2026, "integration-light," <b>margin-neutral near-term</b>, $150–200M capex savings, "couple years' acceleration."</li>
+    </ul>
+    <div class="say"><b class="tag">WHY ALKIRA MATTERS</b> It's Lumen's bid to own the <b>control plane</b> that customers — and eventually AI agents — call. The most strategically important small acquisition they've made. Risk: telcos buy good software then smother it.</div>
+  </div>
+</section>
+
+<!-- 17 LAND AND EXPAND -->
+<section class="slide">
+  <h2>Land-and-expand: the growth engine — and where it really is</h2>
+  <div class="body sm">
+    <ul>
+      <li><b>The staircase:</b> land a customer on one port cheaply, then upsell services on the same port at near-100% margin (no truck rolls). Showcase customer went <b>$2.4k → $46.5k MRR</b> (~19x).</li>
+      <li><b>Adoption (Q1'26, QoQ):</b> NaaS customers <b>+25%</b>, fabric ports <b>+35%</b>, services sold <b>+32%</b>. Three compounding ~30% metrics — the single best Act 3 tripwire.</li>
+      <li><b>Digital revenue:</b> $117M FY25 (+36%), $37M in Q1'26; target $500–600M by 2028, $800–900M by 2030.</li>
+    </ul>
+    <div class="warnbox"><b>The honest math:</b> $117M ÷ ~2,000 customers ≈ ~$5k MRR average vs the $46.5k showcase (~10x). <b>Most customers are still on step one.</b> The bull case is the <i>average</i> customer climbing the staircase — that's the whole Act 3 bet, shown in miniature. <b>Model it at zero; watch ARPU.</b></div>
+  </div>
+</section>
+
+<!-- 18 WHY TELCOS FAIL -->
+<section class="slide">
+  <h2>Why telcos fail at orchestration — and is Lumen different?</h2>
+  <div class="body xs">
+    <table>
+      <tr><th>Failure mode</th><th>Lumen's countermove</th></tr>
+      <tr><td>Operations culture, not software</td><td>Microsoft import (Johnson), "play to win" reboot</td></tr>
+      <tr><td>Can't attract software talent</td><td>Hired from cloud; <b>bought Alkira's team</b></td></tr>
+      <tr><td><b>Legacy OSS/BSS can't support self-service</b> (the big one)</td><td><b>The $1B modernization program IS the back-office rebuild</b> — ERP done (30→1 GLs), 50 mainframe apps retired</td></tr>
+      <tr><td>Innovator's dilemma (cannibalization)</td><td>Legacy dying fast → little to protect</td></tr>
+      <tr><td>Lack of focus</td><td><b>Sold consumer business</b> → pure enterprise play</td></tr>
+      <tr><td>Footprint limits</td><td>Off-net Fabric Port; Alkira's asset-light reach</td></tr>
+    </table>
+    <div class="goodbox"><b>The one structural edge no one else has:</b> Lumen owns the assets the software-winners (Megaport) lack. So the question narrows to "can it do the software half?" — it already has the asset half. And its near-death uniquely <i>frees</i> it to cannibalize &amp; focus.</div>
+    <div class="warnbox"><b>But:</b> this is the graveyard of telco strategy. "Doing the right things" is what every failed telco's deck also said. Better shot than any predecessor ≠ a probable win. <b>Underwrite at zero.</b></div>
+  </div>
+</section>
+
+<!-- 19 AI TAILWINDS -->
+<section class="slide">
+  <h2>AI tailwinds: inference, agents &amp; open-source (double-edged)</h2>
+  <div class="body sm">
+    <ul>
+      <li><b>Training → inference.</b> PCF was largely sold for AI <i>training</i> (mega-cluster interconnect). Management now says PCF is "not the big growth opportunity" — the growth is <b>inference / East-West / Alkira.</b> Inference scatters compute → distributed connectivity demand.</li>
+      <li><b>Agentic upside.</b> API-first networks are the substrate AI agents can command ("agentify"). Alkira is the bid to own the control plane agents call. Risk: hyperscalers are better positioned for that control layer.</li>
+      <li><b>Open-source AI is a net tailwind but rotates demand.</b> Lumen is a <b>model-agnostic toll road</b> — wins from AI proliferation regardless of who wins the models. Open-source distributes compute (helps East-West / NaaS) but threatens mega-cluster training (PCF). Jevons is the swing factor.</li>
+    </ul>
+    <div class="goodbox"><b>GPU-economics soundbite (CFO):</b> "When you're running GPU clusters that cost $2,000/hour, your ability to move data anywhere to keep them spinning is what matters — not the cost of a wave." Bandwidth is cheap insurance against idle GPUs.</div>
+  </div>
+</section>
+
+<!-- SECTION: FINANCIALS -->
+<section class="slide divider">
+  <div class="secnum">PART 5</div>
+  <h1>The financials — the honest numbers</h1>
+  <div class="sub">The crossover, the EBITDA reality, the FCF cliff, the balance sheet.</div>
+</section>
+
+<!-- 20 THREE ACTS -->
+<section class="slide">
+  <h2>The three-act structure (management's own scorecard)</h2>
+  <div class="body">
+    <div class="grid3">
+      <div class="card green"><h3>ACT 1 ✓ DONE</h3><b>Balance-sheet repair.</b> AT&T sale, PCF prepayments, debt $17.8B→$13.1B, all-three upgrades, near-zero maturities to 2030.</div>
+      <div class="card amber"><h3>ACT 2 — IN PROGRESS</h3><b>EBITDA inflection</b> (pro-forma, exiting 2026; real build 2027). Cost-out + Strategic-over-Legacy mix. <b>This is what the stock argues about.</b></div>
+      <div class="card"><h3>ACT 3 — THE OPTION</h3><b>The re-rate.</b> Is Lumen a pipe (infra multiple) or a platform running on its own pipes (better)? NaaS/Alkira. Free option, modeled at zero.</div>
+    </div>
+    <div class="tldr" style="margin-top:18px">The market pays for <b>trend breaks</b>, not levels. The catalyst is embarrassingly specific: <b>two consecutive quarters of pro-forma EBITDA growth</b>, then a 2027 guide showing reported growth with no divestiture asterisk. Each turn of multiple ≈ <b>$3/share</b> on the equity stub.</div>
+  </div>
+</section>
+
+<!-- 21 CROSSOVER -->
+<section class="slide">
+  <h2>Revenue: the crossover happened (Q1 2026)</h2>
+  <div class="body sm">
+    <div style="display:flex;gap:24px;align-items:center">
+      <div style="flex:0 0 430px">
+        <svg viewBox="0 0 430 230" width="430">
+          <line x1="30" y1="185" x2="420" y2="185" stroke="#999"/>
+          <!-- strategic % line 45,45,48,49,51 -->
+          <polyline fill="none" stroke="#0b7a5c" stroke-width="3" points="55,120 130,120 205,108 280,102 355,90"/>
+          <circle cx="55" cy="120" r="4" fill="#0b7a5c"/><circle cx="130" cy="120" r="4" fill="#0b7a5c"/><circle cx="205" cy="108" r="4" fill="#0b7a5c"/><circle cx="280" cy="102" r="4" fill="#0b7a5c"/><circle cx="355" cy="90" r="5" fill="#0b7a5c"/>
+          <text x="40" y="112" font-size="11">45%</text><text x="340" y="82" font-size="12" font-weight="bold" fill="#0b7a5c">51%</text>
+          <text x="42" y="205" font-size="11">1Q25</text><text x="115" y="205" font-size="11">2Q25</text><text x="190" y="205" font-size="11">3Q25</text><text x="265" y="205" font-size="11">4Q25</text><text x="338" y="205" font-size="11">1Q26</text>
+          <text x="60" y="30" font-size="12" font-weight="bold" fill="#0b7a5c">Strategic as % of business revenue</text>
+        </svg>
+      </div>
+      <div style="flex:1">
+        <ul>
+          <li><b>Strategic $1,246M (+9.4% YoY)</b> passed <b>Legacy $1,198M (−13.5%)</b> — 51% vs 49%, first time.</li>
+          <li>Total Business <b>−3.2% YoY but +0.8% QoQ</b> — first sequential growth print.</li>
+          <li>NA enterprise −0.8% YoY ("taking share"); Public Sector +5%, Large Enterprise +1%.</li>
+          <li><b>Soft spots:</b> Mid-Market −9.9%, Wholesale −7.8%.</li>
+        </ul>
+        <div class="warnbox"><b>Honesty check:</b> of the $1,246M "Strategic," only ~$115M is new-economy (Digital $37M + PCF $78M). The other $1,131M is conventional growth products. The crossover is real but carried by the <i>old</i> growth bucket, not the platform — yet.</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- 22 EBITDA -->
+<section class="slide">
+  <h2>EBITDA: four down years — and the run-rate to know cold</h2>
+  <div class="body sm">
+    <div style="display:flex;gap:24px;align-items:center">
+      <div style="flex:0 0 430px">
+        <svg viewBox="0 0 430 230" width="430">
+          <line x1="30" y1="190" x2="420" y2="190" stroke="#999"/>
+          <!-- 6.86,4.63,3.94,3.36,~3.2 scale 24px/B -->
+          <rect x="45"  y="25"  width="55" height="165" fill="#0b7a5c"/><text x="52" y="19" font-size="11">6.86</text><text x="55" y="206" font-size="11">'22</text>
+          <rect x="120" y="79"  width="55" height="111" fill="#0b7a5c"/><text x="127" y="73" font-size="11">4.63</text><text x="130" y="206" font-size="11">'23</text>
+          <rect x="195" y="95"  width="55" height="95"  fill="#0b7a5c"/><text x="202" y="89" font-size="11">3.94</text><text x="205" y="206" font-size="11">'24</text>
+          <rect x="270" y="109" width="55" height="81"  fill="#0b7a5c"/><text x="277" y="103" font-size="11">3.36</text><text x="280" y="206" font-size="11">'25</text>
+          <rect x="345" y="113" width="55" height="77"  fill="#0e5fa8"/><text x="345" y="107" font-size="11">3.1–3.3</text><text x="348" y="206" font-size="11">'26E</text>
+        </svg>
+        <div class="legend">Adj. EBITDA ex-SI ($B). Margin 31.8%→27.1% ('22→'25).</div>
+      </div>
+      <div style="flex:1">
+        <div class="warnbox"><b>THE run-rate (from JPM/TD Cowen fireside):</b> Q1'26's $849M was flattered by <b>~$60–70M of one-time high-margin revenue</b> (a one-time PCF/California item + the consumer stub) plus legacy running hot. The CFO normalized it to a <b>~$770–780M quarterly run-rate ≈ ~$3.1B annualized</b> — the <i>low end</i> of the $3.1–3.3B guide. Don't anchor on the Q1 print.</div>
+        <ul style="margin-top:12px">
+          <li>2026 inflection is <b>modest</b>; the "real build" is 2027 (CFO).</li>
+          <li>"Growth" only works vs the <b>~$2.9B pro-forma</b> base (2025 minus ~$460M divested EBITDA).</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- 23 FCF CLIFF -->
+<section class="slide">
+  <h2>FCF quality: the prepayment sugar-high &amp; the ~$500M cliff <span class="pill r">most important</span></h2>
+  <div class="body sm">
+    <ul>
+      <li><b>Headline FCF is serially flattered by one-time items.</b> FY25 "FCF" of $1.04B <i>included</i> +$2.67B of PCF prepayments → underlying FCF ≈ <b>−$1.6B</b>. The 2026 guide "raise" to $1.9–2.1B is entirely the one-time <b>$729M AT&T operating-cash allocation</b> — zero operational improvement; organic ≈ $1.2–1.4B (itself helped by a one-time ~$400M tax refund).</li>
+      <li><b>The AT&T money:</b> part of the $5.75B sale, but $729M was booked as <i>operating</i> cash (vs investing) → it boosts FCF. "Car-sale money counted as paycheck income" — real, disclosed, but one-time.</li>
+      <li><b>The cliff (CFO directionally confirmed at TD Cowen):</b> 2029 is a <b>"~$500M FCF company"</b> against ~$3.6B EBITDA — FCF goes <i>down</i> as the PCF prepayment cash runs off and taxes normalize, even as EBITDA goes <i>up</i>. De-levering to <b>3.25x</b> comes from EBITDA growth, not FCF paydown.</li>
+    </ul>
+    <div class="say"><b class="tag">SAY THIS BEFORE HE DOES</b> "I never quote the headline FCF or the $1.9–2.1B guide unqualified. Strip the one-times: organic Q1 FCF was ~$128M, and the 2029 steady-state is ~$500M once the prepayment wave recedes. My thesis doesn't rest on near-term FCF — it rests on the prepaid contracts funding the transition and the 2027–28 EBITDA inflection."</div>
+  </div>
+</section>
+
+<!-- 24 BALANCE SHEET -->
+<section class="slide">
+  <h2>Balance sheet: the genuine, banked accomplishment</h2>
+  <div class="body sm">
+    <div style="display:flex;gap:24px;align-items:center">
+      <div style="flex:0 0 320px">
+        <svg viewBox="0 0 320 210" width="320">
+          <line x1="30" y1="175" x2="310" y2="175" stroke="#999"/>
+          <rect x="70"  y="35"  width="70" height="140" fill="#b3392e"/><text x="80" y="29" font-size="12">$17.8B</text><text x="78" y="192" font-size="11">YE25</text>
+          <rect x="190" y="72"  width="70" height="103" fill="#0b7a5c"/><text x="200" y="66" font-size="12">$13.1B</text><text x="180" y="192" font-size="11">3/31/26</text>
+          <text x="120" y="120" font-size="11" fill="#0b7a5c" font-weight="bold">−$4.7B</text>
+          <text x="120" y="134" font-size="11" fill="#0b7a5c" font-weight="bold">AT&amp;T</text>
+        </svg>
+        <div class="legend">Total debt principal.</div>
+      </div>
+      <div style="flex:1">
+        <ul>
+          <li>Entire TSA <b>superpriority stack retired</b>; interest expense down ~45% (~$500M).</li>
+          <li>Maturity runway nearly empty: $31M'26 / $20M'27 / $380M'28 / $1.28B'29; <b>86% matures 2031+</b> (at 6.875–8.5%).</li>
+          <li><b>Upgraded by all three agencies</b> (from S&P SD / Fitch RD in 2024 → B2/B−/B). Covenant 5.25x vs ~3.5x actual.</li>
+          <li>Q2'26: collapses <b>3 borrowing silos → 1 entity, one P&L</b> (credit-clarity catalyst).</li>
+        </ul>
+        <div class="warnbox"><b>Behind the equity:</b> ~$11.3B net debt <i>plus</i> ~$2.3B unfunded pension/OPEB (off-ratio). Book equity is negative. The equity is a <b>levered stub</b> — which is why the upside math works and why size matters.</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- 25 ATT DEAL -->
+<section class="slide">
+  <h2>The AT&T deal: what they sold, and for how much</h2>
+  <div class="body sm">
+    <ul>
+      <li><b>$5.75B</b> for the consumer fiber (Quantum Fiber, 11 states), closed Feb 2, 2026. ~$4.8B + cash retired the superpriority stack.</li>
+      <li><b>Sold cheap:</b> ~$1,438/enabled location vs Frontier ~$2,400 and Ziply ~$3,788. Sell-side: AT&T was "alone negotiating with a highly motivated seller." But it sold ~2x book — a real market mark that fiber &gt; book.</li>
+      <li><b>What they lost:</b> the only growing consumer asset (~$460M direct EBITDA); kept the copper run-off (subs −21%/yr) + stranded costs.</li>
+      <li><b>Undisclosed:</b> after-tax proceeds never reconciled; cash tax on the gain not quantified (Q1 tax expense $377M).</li>
+    </ul>
+    <div class="goodbox"><b>Was it selling the crown jewel?</b> Partly yes — but the counterfactual was $17.8B of debt with superpriority paper on top. They traded the best asset for survival + strategic focus. "I'd rather own a de-risked enterprise pure-play than a levered hybrid praying on refis."</div>
+  </div>
+</section>
+
+<!-- SECTION: VALUATION -->
+<section class="slide divider">
+  <div class="secnum">PART 6</div>
+  <h1>Valuation &amp; margin of safety</h1>
+  <div class="sub">What you're paying, the scenario tree, and where the safety actually is.</div>
+</section>
+
+<!-- 26 VALUATION -->
+<section class="slide">
+  <h2>Valuation: cheap vs peers, but on a declining base</h2>
+  <div class="body sm">
+    <table>
+      <tr><th>Reference</th><th>EV/EBITDA</th><th>Note</th></tr>
+      <tr><td><b>LUMN</b></td><td><b>~6.3x</b> (2026E)</td><td>on a <i>declining</i> EBITDA base</td></tr>
+      <tr><td>AT&T / Verizon</td><td>~7.0x / ~7.6x</td><td><i>stable</i> EBITDA, dividends, IG ratings</td></tr>
+      <tr><td>Frontier take-out</td><td>~8.4x</td><td>infra M&A mark</td></tr>
+      <tr><td>Uniti / Zayo-CCI</td><td>~10x / ~7.2x</td><td>fiber-infra comps</td></tr>
+    </table>
+    <div class="grid2" style="margin-top:14px">
+      <div class="card green"><h3>BULL VALUE-ANGLE</h3>Asset marks (~$47k/route-mile, AT&T paid 2x book) roughly cover the ~$20B EV. 0 sell-side Buys = sentiment floor. Re-rate to 7.5–8x = $15–16.</div>
+      <div class="card red"><h3>BEAR VALUE-ANGLE</h3>Trades <i>above</i> consensus PT (~$8) &amp; Morningstar FVE (~$7.50) after +96% TTM. Equity is a levered stub; FCF rolling off to ~$500M.</div>
+    </div>
+  </div>
+</section>
+
+<!-- 27 SCENARIO + MOS -->
+<section class="slide">
+  <h2>Scenario tree &amp; margin of safety</h2>
+  <div class="body sm">
+    <table>
+      <tr><th>Scenario (2028)</th><th>EBITDA</th><th>×</th><th>Per share</th><th>Return</th></tr>
+      <tr><td><b>Bull</b> — PCF ramps, $1B cost-out lands, re-rate</td><td>~$3.4B</td><td>7.5–8x</td><td>~$15–16.50</td><td class="up">+75–95%</td></tr>
+      <tr><td><b>Base</b> — guide met, slow grind, no re-rate</td><td>~$3.1–3.2B</td><td>6.5x</td><td>~$9.70</td><td class="fl">+14%</td></tr>
+      <tr><td><b>Bear</b> — inflection slips, hyperscaler digestion</td><td>~$2.7B</td><td>5.5x</td><td>~$3.30</td><td class="dn">−61%</td></tr>
+    </table>
+    <div class="warnbox"><b>The Sycamore-honest answer (downside first):</b> the margin of safety was at my <b>~$6 entry</b> (~5.5x, paying nothing for PCF optionality), not at $8.49. Today the payoff is ~symmetric (−61% / +90%) — not a Sycamore buffer. What remains is an <b>asset floor</b> that protects <i>creditors</i> convincingly and the <i>equity</i> only via continued deleveraging. The stock printed $3.37 within the last year — the downside is live.</div>
+    <div class="say"><b class="tag">DISCIPLINE</b> Hold (sized for −60%); add ~$6.50–7.00; trim into euphoria &gt;~8x without PF-growth confirmation, or on any kill-switch.</div>
+  </div>
+</section>
+
+<!-- SECTION: RISK -->
+<section class="slide divider">
+  <div class="secnum">PART 7</div>
+  <h1>Risks &amp; discipline</h1>
+  <div class="sub">Downside first. Ranked risks and pre-committed exits.</div>
+</section>
+
+<!-- 28 RISKS -->
+<section class="slide">
+  <h2>Ranked risks (downside first)</h2>
+  <div class="body xs">
+    <table>
+      <tr><th>#</th><th>Risk</th><th>The specifics</th></tr>
+      <tr><td>1</td><td><b>FCF illusion unwinds</b></td><td>Prepayments taper while capex stays $3.2–3.4B; FCF reverts toward negative underlying. 2026 headline already propped by $729M + tax refund. <b>FCF falls to ~$500M by 2029.</b></td></tr>
+      <tr><td>2</td><td><b>Core outruns the pivot</b></td><td>Legacy −14%; VPN/Ethernet structurally replaced; Mid-Market −10% six quarters; waves −11%/yr. No total revenue growth until 2029.</td></tr>
+      <tr><td>3</td><td><b>Hyperscaler capex / concentration</b></td><td>~$13B across few counterparties; debt-financed capex; MSFT cancelled DC leases in early '25; Q1'26 added <i>zero</i> new PCF dollars.</td></tr>
+      <tr><td>4</td><td><b>Fiber glut (2001 redux)</b></td><td>Zayo/AT&T/Verizon/LSC/Ziply all building AI corridors; Level 3 was the poster child of the last glut.</td></tr>
+      <tr><td>5</td><td><b>PCF margin opacity</b></td><td>Deal-level cash-in/out never disclosed; Kerrisdale est. ~$21M/yr recurring on first $5B.</td></tr>
+      <tr><td>6</td><td><b>Execution / credibility</b></td><td>Two missed inflection promises; adverse post-AT&T mix; leverage re-rises mechanically at lower EBITDA; tax &amp; litigation tails.</td></tr>
+    </table>
+  </div>
+</section>
+
+<!-- 29 KILL SWITCHES -->
+<section class="slide">
+  <h2>Kill-switches — pre-committed exits (the Sycamore move)</h2>
+  <div class="body xs">
+    <table>
+      <tr><th>#</th><th>Trigger</th><th>Test</th></tr>
+      <tr><td>K1</td><td>EBITDA guide cut</td><td>Below the $3.1B floor / FY lands under ~$2.9B PF base</td></tr>
+      <tr><td>K2</td><td>PCF stalls/reverses</td><td>Still ~$13B at YE26 (Q1 already added $0), or any cancellation</td></tr>
+      <tr><td>K3</td><td>Prepayment engine stops, spend continues</td><td>Deferred-rev build &lt;~$300M/qtr with capex &gt;$800M/qtr &amp; organic FCF negative</td></tr>
+      <tr><td>K4</td><td>Core re-accelerates down</td><td>Business revenue worse than −5% YoY for 2 qtrs, or Strategic &lt;+5%</td></tr>
+      <tr><td>K5</td><td>Leverage &gt;4x or new secured/priming debt</td><td>—</td></tr>
+      <tr><td>K6</td><td>Hyperscaler capex guide-downs (leading indicator)</td><td>2+ of MSFT/META/AMZN/GOOGL cut</td></tr>
+      <tr><td>K7</td><td>Cost program slips</td><td>&lt;$700M run-rate exiting 2026</td></tr>
+      <tr><td>K8–K10</td><td>2028 milestones slip · mgmt departs / taxonomy change · wave pricing erosion accelerates</td><td>—</td></tr>
+    </table>
+    <div class="goodbox"><b>Process answer for James:</b> "Ten pre-committed kill-switches checked each 8-K/10-Q; the four load-bearing ones are the EBITDA guide vs the $2.9B PF base, PCF deal flow, the deferred-rev-vs-capex spread, and the Business decline rate. Plus an external dashboard: hyperscaler capex guides and TeleGeography wave pricing."</div>
+  </div>
+</section>
+
+<!-- SECTION: POSITION + JAMES -->
+<section class="slide divider">
+  <div class="secnum">PART 8</div>
+  <h1>My position, the verdict &amp; the James playbook</h1>
+  <div class="sub">How I'm positioned, the three-attribute scorecard, and how to handle the room.</div>
+</section>
+
+<!-- 30 POSITION -->
+<section class="slide">
+  <h2>My position — the narrative arc</h2>
+  <div class="body sm">
+    <div class="grid3">
+      <div class="card"><h3>WHY I BOUGHT (~$6, 2H'25)</h3>Downside first: ~5.5x with the AT&T $5.75B signed — creditor risk being contractually retired while equity still priced for distress. Variant view: consensus called PCF cash "low quality" but missed that prepayments fund the rebuild + paydown, extending the option for free.</div>
+      <div class="card green"><h3>WHAT HAPPENED</h3>Thesis events landed: close, all-three upgrades, +$2.5B PCF + Anthropic, cost-out beat, the crossover. Ran to $11.95 (Nov'25), then Q1 EPS optics knocked it to ~$8.49. <b>Marked ~+42%. Did not add above $9.</b></div>
+      <div class="card amber"><h3>WHAT I DO NOW</h3><b>Hold</b>, sized for −60%; kill-switches armed. <b>Add</b> ~$6.50–7.00. <b>Trim/exit</b> on K-triggers or euphoria &gt;~8x without PF growth. A small position, not a core holding, until the inflection prints twice.</div>
+    </div>
+    <div class="tldr" style="margin-top:16px">The honest posture for a downside-first shop: the entry was the margin of safety; today's decision is a disciplined <b>hold</b> with hard invalidation — and demonstrating <i>sell</i> discipline is worth more here than defending a price target.</div>
+  </div>
+</section>
+
+<!-- 31 SCORECARD -->
+<section class="slide">
+  <h2>Sycamore three-attribute scorecard</h2>
+  <div class="body sm">
+    <table>
+      <tr><th>Attribute</th><th>Verdict</th><th>The one-line</th></tr>
+      <tr><td><b>(a) Better business / financial strength</b></td><td class="fl">QUALIFIED PASS</td><td>Scarce route/conduit asset (AT&T paid 2x book); enterprise stabilizing; B2/B−/B. But strength is 4 months old, EBITDA down 4 yrs, underlying FCF negative ex-prepayments.</td></tr>
+      <tr><td><b>(b) Valuation disparity / margin of safety</b></td><td class="fl">MARGINAL at $8.49<br>(clear at ~$6)</td><td>~1 turn cheap vs peers, asset value ≈ EV — but above consensus &amp; FVE after +96%. Equity is a levered stub. The weakest leg.</td></tr>
+      <tr><td><b>(c) Improving fundamentals</b></td><td class="up">PASS (strongest)</td><td>Debt fix executed, cost-out ahead, $13B contracted, crossover achieved, CEO insider buying. But inflection promised &amp; missed twice.</td></tr>
+    </table>
+    <div class="warnbox" style="margin-top:14px"><b>Verdict:</b> a positive-change special situation with an asset floor — not a classic quality-value name. Lead with downside, present the kill-switches, recommend initiation on weakness (~$6.50–7) or a starter sized for the −60% bear case.</div>
+  </div>
+</section>
+
+<!-- 32 READING JAMES -->
+<section class="slide">
+  <h2>Reading James Albers (CS · ex-Accenture/IBM)</h2>
+  <div class="body sm">
+    <ul>
+      <li><b>He lived the disruption of Lumen's legacy book.</b> As an SI consultant he ran MPLS→SD-WAN migrations and cloud transformations. He'll smell tech-washing instantly and won't be impressed by buzzwords.</li>
+      <li><b>He's technical.</b> You can use precise language (DCI, IRU, infrastructure-as-code, control plane) — it builds credibility. Explain mechanisms, not slogans.</li>
+      <li><b>He'll structure-test you</b> consultant-style: "so what's the answer in one sentence?" Lead with the conclusion, then support.</li>
+      <li><b>Downside-first culture.</b> Concede fast and precisely, then show the concession was already in your position size and kill-switches. Candidates fail by defending everything.</li>
+    </ul>
+    <div class="warnbox"><b>The landmine — "intermediaries add cost without innovation" (slide 4).</b> That bullet attacks <i>his profession.</i> Don't nod along. Reframe: "Integration added real value in Cloud 1.0; what's happening is some of it is moving into the network's control plane — which is exactly the Alkira/NaaS logic. Lumen isn't ending intermediation; it's trying to <i>become</i> the new intermediary, in software." Shows you understand his world AND won't be captured by a deck.</div>
+  </div>
+</section>
+
+<!-- 33 QA 1 -->
+<section class="slide">
+  <h2>Must-nail Q&amp;A (1 of 2)</h2>
+  <div class="body xs">
+    <div style="margin-bottom:12px">
+      <div class="q">"Walk me through free cash flow. Is this company generating cash?"</div>
+      <div class="qwhy">THE test — the first answer sets your credibility for the meeting.</div>
+      <div class="qa-a"><b>Lead with the concession:</b> "Not organically, yet. FY25 FCF of $1.04B included +$2.67B of PCF prepayments — underlying was ~−$1.6B. The 2026 'raise' to $1.9–2.1B is the one-time $729M AT&T money; organic is ~$1.2–1.4B and falls to ~$500M by 2029 as prepayments run off. My thesis doesn't rest on near-term FCF — it rests on prepaid contracts funding the transition and the 2027–28 inflection. If the prepayment engine stops first (K3), I'm out." <span class="dn">Never quote the $1.9–2.1B unqualified.</span></div>
+    </div>
+    <div>
+      <div class="q">"Where's the margin of safety at $8.49? The stock doubled."</div>
+      <div class="qwhy">Sycamore's first principle = limiting permanent loss.</div>
+      <div class="qa-a">"Honest answer: it was at my ~$6 entry, not today. At $8.49 the stock is above consensus (~$8) and Morningstar (~$7.50), and my tree is ~−61%/+90% — symmetric, not protected. What remains is an asset floor (~$16B fiber/conduit vs $20B EV, proven by AT&T paying 2x book) that protects the enterprise, and the equity only via deleveraging. So I hold with armed exits; I'd initiate at $6.50–7, not here."</div>
+    </div>
+  </div>
+</section>
+
+<!-- 34 QA 2 -->
+<section class="slide">
+  <h2>Must-nail Q&amp;A (2 of 2)</h2>
+  <div class="body xs">
+    <div style="margin-bottom:11px">
+      <div class="q">"Why don't Microsoft and Meta just build their own fiber?"</div>
+      <div class="qa-a"><b>Time, not money.</b> Greenfield intercity = 3–5+ yrs of permits/easements. Lumen delivers in months (builds ran 130% of target; "never experienced this speed from a telco"). In an AI race, prepaying Lumen buys schedule certainty. Concede: they self-build where it's worth it; the 10-K admits some hyperscalers "reduced reliance on our network." The moat is route scarcity, not customer captivity.</div>
+    </div>
+    <div style="margin-bottom:11px">
+      <div class="q">"Legacy declines 14%/yr. You believe revenue grows in 2029? They've promised before."</div>
+      <div class="qa-a">"I don't take it on faith — they missed 'stability in 2024' and the '2026 &gt;$3.5B EBITDA' call. I anchor on arithmetic: Strategic (+9%, 51%) outgrowing Legacy (−14%, 49%) crosses zero ~2028 if both rates merely hold — checkable every quarter (K4). I credit what they <i>executed</i> (debt fix, cost-out, the sale), not what they promise."</div>
+    </div>
+    <div>
+      <div class="q">"What kills this? Give me the bear case better than a short-seller."</div>
+      <div class="qa-a">(1) PCF is construction-margin one-time cash (Kerrisdale: ~$21M/yr on first $5B; mgmt won't disclose cash-in/out). (2) Hyperscaler capex is debt-financed &amp; cyclical — one digestion stops new TCV. (3) Core declines −3% organically with waves −11%/yr as five rivals overbuild. End state: EBITDA ~$2.7B, leverage re-crosses 4.5x, equity a ~$3 stub. "That's why the position is small and the exits are pre-committed."</div>
+    </div>
+  </div>
+</section>
+
+<!-- 35 TRAPS -->
+<section class="slide">
+  <h2>Traps to avoid in the room</h2>
+  <div class="body">
+    <ul>
+      <li>Never quote headline FCF or the $1.9–2.1B guide <b>without the one-time asterisk.</b></li>
+      <li>Never call PCF "revenue growth" or Lumen "an AI company." PCF added $116M of revenue; it's the <b>cash bridge</b>, not the growth engine (mgmt's own words).</li>
+      <li><b>Q1'26 EPS confusion:</b> adjusted −$0.47 is <i>worse</i> than GAAP −$0.20 because adjusted excludes the $596M sale gain.</li>
+      <li>Don't cite "2029 EBITDA $3.6B / FCF $500M / 3.25x" as Investor Day guidance — it's a TD Cowen analyst's triangulation the CFO <i>directionally</i> blessed; only 3.25x was explicitly stated.</li>
+      <li><b>Leverage has three bases</b> (~3.5x computed / 3.8x CFO / "&lt;4x" PR) — quote one and label it; never average them.</li>
+      <li>Don't accept "intermediaries add cost without innovation" — reframe it (slide 32).</li>
+    </ul>
+  </div>
+</section>
+
+<!-- 36 CHEAT CARD -->
+<section class="slide">
+  <h2>Numbers to know cold</h2>
+  <div class="body xs">
+    <table>
+      <tr><th>#</th><th>Number</th><th>What</th></tr>
+      <tr><td>1</td><td>$8.49 / ~$8.7B / ~$20.1B</td><td>Price (6/11) / mkt cap / EV</td></tr>
+      <tr><td>2</td><td>$12.4B (−5%) / $3.36B (27.1%)</td><td>FY25 rev / adj EBITDA &amp; margin</td></tr>
+      <tr><td>3</td><td>$3.1–3.3B vs ~$2.9B PF; ~$770–780M/qtr run-rate</td><td>2026 EBITDA guide vs PF base; normalized run-rate</td></tr>
+      <tr><td>4</td><td>$1.04B → −$1.6B → ~$500M (2029)</td><td>FY25 headline FCF / underlying / steady-state cliff</td></tr>
+      <tr><td>5</td><td>~$13B / $116M / ~90% / ~50%</td><td>PCF TCV / FY25 rev recognized / cash upfront / aggregate cash margin</td></tr>
+      <tr><td>6</td><td>$5.75B / ~$1,438/loc</td><td>AT&T sale / per enabled location (vs $2,400 FYBR)</td></tr>
+      <tr><td>7</td><td>$17.8B → $13.1B; ~3.5x; B2/B−/B</td><td>Debt; net leverage; ratings (from SD/RD)</td></tr>
+      <tr><td>8</td><td>$1,246M (+9.4%) vs $1,198M (−13.5%)</td><td>Q1'26 Strategic vs Legacy — the crossover (51%)</td></tr>
+      <tr><td>9</td><td>$400M → $700M → $1B+</td><td>Cost-out run-rate exiting '25 / '26 / '27</td></tr>
+      <tr><td>10</td><td>+15–16 / +14% / −61%</td><td>Bull / base / bear per-share outcomes</td></tr>
+      <tr><td>11</td><td>~$2.3B</td><td>Unfunded pension + OPEB (off-ratio, behind equity)</td></tr>
+      <tr><td>12</td><td>−$0.47 vs ~−$0.06</td><td>Q1'26 adj EPS vs consensus (the optical miss)</td></tr>
+    </table>
+  </div>
+</section>
+
+<!-- 37 CLOSE -->
+<section class="slide divider">
+  <div class="secnum">THE ONE-LINE TAKEAWAY</div>
+  <h1>"A banked cash bridge funding an unproven growth engine — with an asset floor under the debt."</h1>
+  <div class="sub">Lumen is a bet that other people's money (AI prepayments + the AT&T sale) pays down the mortgage before the house finishes rotting. Act 1 (debt) is done; Act 2 (EBITDA inflection) is in flight and checkable every quarter; Act 3 (the platform re-rate) is a free option. I own it small, sized for the −60% bear case, with ten pre-committed exits — and I'd add real weight only on a pullback to $6.50–7 or two clean quarters of pro-forma EBITDA growth.</div>
+</section>
+
+</div>
+
+<script>
+  var slides = Array.prototype.slice.call(document.querySelectorAll('.slide'));
+  var i = 0;
+  var counter = document.getElementById('counter');
+  var bar = document.getElementById('bar');
+  function show(n){
+    i = Math.max(0, Math.min(slides.length-1, n));
+    slides.forEach(function(s,k){ s.classList.toggle('active', k===i); });
+    counter.textContent = (i+1)+' / '+slides.length;
+    bar.style.width = ((i)/(slides.length-1)*100)+'%';
+    // add footer to non-divider slides if missing
+  }
+  document.addEventListener('keydown', function(e){
+    if(e.key==='ArrowRight'||e.key==='PageDown'||e.key===' '){ show(i+1); e.preventDefault(); }
+    else if(e.key==='ArrowLeft'||e.key==='PageUp'){ show(i-1); e.preventDefault(); }
+    else if(e.key==='Home'){ show(0); }
+    else if(e.key==='End'){ show(slides.length-1); }
+  });
+  document.getElementById('stage').addEventListener('click', function(e){
+    var x = e.clientX / window.innerWidth;
+    if(x > 0.5) show(i+1); else show(i-1);
+  });
+  // footers on content slides
+  slides.forEach(function(s,k){
+    if(!s.classList.contains('divider')){
+      var f = document.createElement('footer');
+      f.innerHTML = '<span class="tag">LUMN · Sycamore interview prep</span><span>'+(k+1)+'</span>';
+      s.appendChild(f);
+    }
+  });
+  show(0);
+</script>
+</body>
+</html>
